@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Block internal/auth pages from indexing
+Disallow: /dashboard
+Disallow: /auth
+
+Sitemap: https://swag-aws.vercel.app/sitemap.xml
