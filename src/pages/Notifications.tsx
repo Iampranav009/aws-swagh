@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
-import { Gift, Star, Crown, Zap, Award, Sparkles, Trophy, CheckCircle2, Lock } from 'lucide-react';
+import { Gift, Star, Crown, Zap, Award, Sparkles, Trophy, CheckCircle2 } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -224,7 +224,7 @@ function GiftModal({ milestone, onClose }: { milestone: Milestone; onClose: () =
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Notifications() {
-  const { user } = useAuth();
+  useAuth();
   const { leaderboard, loading } = useLeaderboard();
 
   const userAlias = localStorage.getItem('aws_alias') || '';

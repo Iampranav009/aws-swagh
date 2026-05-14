@@ -63,7 +63,10 @@ export const FeatureHighlightProCard = React.forwardRef<
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         style={{ perspective: 1000 }}
-        {...props}
+        {...(() => {
+          const { onDrag, onDragStart, onDragEnd, onAnimationStart, ...rest } = props as any;
+          return rest;
+        })()}
       >
         {/* Background gradient glow */}
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-80 blur-3xl" />

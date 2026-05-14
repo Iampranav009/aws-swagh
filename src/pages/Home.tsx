@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import Hero from '../components/Hero';
 import SignupProcess from '../components/SignupProcess';
 import FeaturesSection from '../components/FeaturesSection';

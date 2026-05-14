@@ -41,7 +41,7 @@ export default function SwagWinnersSection() {
     <div className="w-full space-y-16 py-8">
       {/* Rank Based Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {RANK_DATA.map((item, index) => (
+        {RANK_DATA.map((item) => (
           <motion.div
             key={item.rank}
             initial={{ opacity: 0, y: 30 }}
