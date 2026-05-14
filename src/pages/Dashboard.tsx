@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar';
 import TierToast from '../components/TierToast';
 import { Link } from 'react-router-dom';
 import { getTierForReferrals, getNextTier } from '../lib/tiers';
+import { normalizeAlias } from '../lib/utils';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -13,6 +14,7 @@ export default function Dashboard() {
 
   const [userAlias, setUserAlias] = useState(localStorage.getItem('aws_alias') || '');
   const [aliasInput, setAliasInput] = useState('');
+  const [aliasError, setAliasError] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedSignup, setCopiedSignup] = useState(false);
   const [copiedForm, setCopiedForm] = useState(false);
@@ -30,10 +32,24 @@ export default function Dashboard() {
     }
   }, [userAlias, user, leaderboard, dataLoading]);
 
+  const handleAliasChange = (value: string) => {
+    setAliasInput(value);
+    if (/\s/.test(value)) {
+      setAliasError('Alias ID must not contain spaces. Please remove any spaces and try again.');
+    } else {
+      setAliasError('');
+    }
+  };
+
   const handleSaveAlias = (e: React.FormEvent) => {
     e.preventDefault();
-    let normalized = aliasInput.trim().toUpperCase();
-    if (normalized.startsWith('@')) normalized = normalized.substring(1);
+    // Final guard — reject if spaces still present
+    if (/\s/.test(aliasInput)) {
+      setAliasError('Alias ID must not contain spaces. Please remove any spaces and try again.');
+      console.warn('[Alias] Submission blocked: input contains spaces →', JSON.stringify(aliasInput));
+      return;
+    }
+    const normalized = normalizeAlias(aliasInput);
     if (normalized) {
       localStorage.setItem('aws_alias', normalized);
       setUserAlias(normalized);
@@ -57,15 +73,31 @@ export default function Dashboard() {
               <input
                 type="text"
                 value={aliasInput}
-                onChange={e => setAliasInput(e.target.value)}
+                onChange={e => handleAliasChange(e.target.value)}
                 required
                 placeholder="e.g. JDOE123"
-                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00CFFF] focus:ring-1 focus:ring-[#00CFFF] transition-all"
+                className={`w-full bg-black/20 border rounded-xl px-4 py-3 text-white focus:outline-none transition-all ${
+                  aliasError
+                    ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                    : 'border-white/10 focus:border-[#00CFFF] focus:ring-1 focus:ring-[#00CFFF]'
+                }`}
               />
+              {aliasError && (
+                <div className="flex items-start gap-2 mt-2 px-1">
+                  <span className="text-red-400 text-[11px] leading-snug">
+                    ⚠️ {aliasError}
+                  </span>
+                </div>
+              )}
             </div>
             <button
               type="submit"
-              className="bg-gradient-to-r from-[#7C3AED] to-[#4F46E5] text-white font-medium py-3.5 rounded-xl hover:opacity-90 shadow-[0_0_20px_rgba(124,58,237,0.4)] transition-all"
+              disabled={!!aliasError}
+              className={`text-white font-medium py-3.5 rounded-xl transition-all ${
+                aliasError
+                  ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-[#7C3AED] to-[#4F46E5] hover:opacity-90 shadow-[0_0_20px_rgba(124,58,237,0.4)]'
+              }`}
             >
               Link Alias
             </button>
@@ -76,25 +108,23 @@ export default function Dashboard() {
     );
   }
 
-  /** Matches the normalisation in sheets.ts */
-  const cleanKey = (s: string) => (s || '').replace(/^@/, '').trim().toUpperCase();
-  const myAlias = cleanKey(userAlias);
+  const myAlias = normalizeAlias(userAlias);
 
-  const currentUserData = leaderboard.find(u => cleanKey(u.alias) === myAlias);
-  const rank = leaderboard.findIndex(u => cleanKey(u.alias) === myAlias) + 1;
+  const currentUserData = leaderboard.find(u => normalizeAlias(u.alias) === myAlias);
+  const rank = leaderboard.findIndex(u => normalizeAlias(u.alias) === myAlias) + 1;
   const isTop10 = rank > 0 && rank <= 10;
 
   // Build processed users, flagging duplicates
   const seenAliases = new Set<string>();
   const allProcessedUsers = allUsers.map(u => {
-    const alias = cleanKey(u.alias);
+    const alias = normalizeAlias(u.alias);
     const isDuplicate = seenAliases.has(alias);
     seenAliases.add(alias);
     return { ...u, alias, isDuplicate };
   });
 
   // Users who entered MY alias as their referral code
-  const referredUsers = allProcessedUsers.filter(u => cleanKey(u.referralCode) === myAlias);
+  const referredUsers = allProcessedUsers.filter(u => normalizeAlias(u.referralCode) === myAlias);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(userAlias);

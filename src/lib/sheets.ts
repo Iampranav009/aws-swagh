@@ -1,3 +1,5 @@
+import { normalizeAlias, levenshtein } from './utils';
+
 export interface SheetUser {
   name: string;
   alias: string;
@@ -14,9 +16,55 @@ const API_KEY  = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY;
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEETS_ID || "1Di4lk_UcuF_3HBUj_p35N26h9fPJ4e0-lF9y2OI_WdM";
 const SHEET_NAME = "Form Responses 1";
 
-/** Normalise an alias/referral code — strip @, spaces, uppercase */
-function clean(s: string): string {
-  return (s || '').replace(/^@/, '').trim().toUpperCase();
+// ── Re-export the single source of truth for alias normalisation ────────────
+export { normalizeAlias };
+
+// Internal shorthand
+const clean = normalizeAlias;
+
+// ── Fuzzy referral-code resolver ────────────────────────────────────────────
+/**
+ * Given a referral code that doesn't exactly match any registered alias,
+ * try to find the "closest" alias using Levenshtein distance.
+ *
+ * Rules (conservative to avoid false positives):
+ *   1. Distance must be ≤ 2 edits.
+ *   2. Distance / max(len_a, len_b) must be ≤ 0.30  (≤30 % different).
+ *   3. If multiple aliases tie on distance, pick the shortest one.
+ *
+ * Returns the best matching alias string, or null if no safe match found.
+ */
+function fuzzyResolveAlias(
+  code: string,
+  knownAliases: string[]
+): string | null {
+  if (!code || knownAliases.length === 0) return null;
+
+  const MAX_DISTANCE = 2;
+  const MAX_RATIO    = 0.30;
+
+  let bestAlias: string | null = null;
+  let bestDist = Infinity;
+
+  for (const alias of knownAliases) {
+    const dist = levenshtein(code, alias);
+    if (dist > MAX_DISTANCE) continue;
+
+    const ratio = dist / Math.max(code.length, alias.length);
+    if (ratio > MAX_RATIO) continue;
+
+    if (dist < bestDist || (dist === bestDist && alias.length < (bestAlias?.length ?? Infinity))) {
+      bestDist  = dist;
+      bestAlias = alias;
+    }
+  }
+
+  if (bestAlias) {
+    console.log(
+      `[Sheets] Fuzzy match: "${code}" → "${bestAlias}" (distance=${bestDist})`
+    );
+  }
+  return bestAlias;
 }
 
 export async function fetchUsers(): Promise<SheetUser[]> {
@@ -79,18 +127,70 @@ export function processLeaderboard(users: SheetUser[]): LeaderboardEntry[] {
     }
   }
 
+  const knownAliases = Object.keys(map);
+
   // ── Step 2: Credit referrers ──
-  // Walk every UNIQUE user (from the map) and credit whoever they referred under
+  // Walk every UNIQUE user (from the map) and credit whoever they referred under.
+  // If the referral code doesn't exactly match a known alias, try fuzzy resolution.
   for (const entry of Object.values(map)) {
-    const refCode = entry.referralCode;
+    let refCode = entry.referralCode;
+    if (!refCode) continue;
+    if (refCode === entry.alias) continue; // self-referral — skip
 
-    // Skip: empty, self-referral, or referrer not registered
-    if (!refCode)               continue;
-    if (refCode === entry.alias) continue;
-    if (!map[refCode])           continue;
+    // Exact match first
+    let referrer = map[refCode];
 
-    map[refCode].referrals += 1;
-    map[refCode].points    += 15;
+    // Fuzzy fallback (minor typos)
+    if (!referrer) {
+      const fuzzy = fuzzyResolveAlias(refCode, knownAliases);
+      if (fuzzy && fuzzy !== entry.alias) {
+        referrer = map[fuzzy];
+      }
+    }
+
+    if (!referrer) continue;
+
+    referrer.referrals += 1;
+    referrer.points    += 15;
+  }
+
+  // ── Step 2.5: Special Manual Approval for YATHARTH29 ──────────────────────
+  // The user requested to "approve all his referrals" because of Google Form errors.
+  // We'll walk the RAW users list and count ANY row that used "YATHARTH29" as the 
+  // referral code but WASN'T already counted in the unique map above.
+  const targetReferrer = map['YATHARTH29'];
+  if (targetReferrer) {
+    // Track which unique users were already credited to him
+    const alreadyCreditedAliases = new Set(
+      Object.values(map)
+        .filter(entry => {
+          let refCode = entry.referralCode;
+          if (refCode === 'YATHARTH29') return true;
+          const fuzzy = fuzzyResolveAlias(refCode, Object.keys(map));
+          return fuzzy === 'YATHARTH29';
+        })
+        .map(entry => entry.alias)
+    );
+
+    // Count all other rows that used his code
+    for (const rawUser of users) {
+      const refCode = clean(rawUser.referralCode);
+      const userAlias = clean(rawUser.alias);
+      
+      // If it's his code, but NOT a unique user we already counted
+      if (refCode === 'YATHARTH29' && (!userAlias || !alreadyCreditedAliases.has(userAlias))) {
+        // Skip self-referral
+        if (userAlias === 'YATHARTH29') continue;
+        
+        targetReferrer.referrals += 1;
+        targetReferrer.points += 15;
+        
+        // If it had an alias, add it to credited so we don't double count if same duplicate appears twice in raw list
+        if (userAlias) {
+          alreadyCreditedAliases.add(userAlias);
+        }
+      }
+    }
   }
 
   // ── Step 3: Sort descending by points, then alphabetically by name ──
