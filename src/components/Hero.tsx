@@ -21,15 +21,15 @@ export default function Hero() {
       <div className="absolute bottom-0 left-0 z-20 px-6 sm:px-12 pb-16 sm:pb-24 max-w-2xl">
         {/* Giveaway badge */}
         <div className="mb-5 inline-flex items-center gap-2 liquid-glass rounded-full px-4 py-2">
-          <Gift size={15} className="text-[#FF9900]" />
-          <span className="text-[#FF9900] text-xs sm:text-sm font-semibold tracking-widest uppercase">
+          <Gift size={15} className="text-[#7C3AED]" />
+          <span className="text-[#7C3AED] text-xs sm:text-sm font-semibold tracking-widest uppercase">
             AWS Goodies Giveaway
           </span>
         </div>
 
         <h1 className="text-white text-4xl sm:text-5xl lg:text-7xl font-semibold leading-tight tracking-tight mb-6 drop-shadow-2xl">
           Build. Refer.<br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF9900] to-[#00CFFF]">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#00CFFF]">
             Win Big.
           </span>
         </h1>
@@ -42,17 +42,19 @@ export default function Hero() {
         <div className="flex flex-wrap items-center gap-4">
           <Link
             to="/auth?signup=true"
-            className="liquid-glass flex items-center gap-2 text-white text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full hover:bg-white/10 hover:shadow-[0_0_24px_rgba(255,153,0,0.25)] transition-all"
+            className="liquid-glass relative group overflow-hidden bg-white/5 border border-white/10 flex items-center gap-2 text-white text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full hover:bg-white/10 hover:border-[#7C3AED]/50 transition-all duration-300"
           >
-            <Trophy size={17} />
-            Join the Referral Programme
+            <Trophy size={18} className="text-[#7C3AED]" />
+            Join Now
           </Link>
-          <a
-            href="#goodies"
-            className="liquid-glass text-white/80 text-sm sm:text-base font-medium px-8 py-3.5 rounded-full hover:bg-white/10 hover:text-white transition-all"
+          
+          <Link
+            to="/leaderboard"
+            className="liquid-glass flex items-center gap-2 text-white text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full hover:bg-white/10 transition-all border border-white/10 hover:border-[#00CFFF]/50"
           >
-            🎁 See Goodies
-          </a>
+            <Trophy size={17} className="text-[#00CFFF]" />
+            Leaderboard
+          </Link>
         </div>
       </div>
 

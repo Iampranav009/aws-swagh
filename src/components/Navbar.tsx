@@ -23,7 +23,10 @@ export default function Navbar() {
   const navLinks = [
     { label: 'Home', path: '/' },
     { label: 'Leaderboard', path: '/leaderboard' },
-    ...(user ? [{ label: 'Dashboard', path: '/dashboard' }] : []),
+    { label: 'Rewards', path: user ? '/rewards' : '/reward' },
+    ...(user ? [
+      { label: 'Dashboard', path: '/dashboard' },
+    ] : []),
   ];
 
   return (

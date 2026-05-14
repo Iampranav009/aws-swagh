@@ -1,4 +1,5 @@
-import { Phone, MapPin, Globe, User } from 'lucide-react';
+import { User, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const SOCIAL_LINKS = [
   {
@@ -45,6 +46,7 @@ const SOCIAL_LINKS = [
   },
 ];
 
+
 export default function ConnectSection() {
   return (
     <section className="relative py-24 px-6 bg-[#0B0F1A] overflow-hidden">
@@ -78,63 +80,22 @@ export default function ConnectSection() {
         </div>
 
         {/* Main content grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
 
-          {/* Left — Founder card + contact */}
-          <div className="space-y-5">
-
-            {/* Founder */}
-            <div className="liquid-glass rounded-2xl p-6 border border-white/8 hover:border-white/15 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] flex items-center justify-center shadow-[0_0_18px_rgba(124,58,237,0.35)] flex-shrink-0">
-                  <User size={17} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-white font-semibold text-sm">Pranav Shinde</p>
-                  <p className="text-white/40 text-xs">Founder · AWS Student Builder Group at JDIET</p>
-                </div>
+          {/* Left — Founder card */}
+          <div className="liquid-glass rounded-2xl p-6 border border-white/8 hover:border-white/15 transition-all duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] flex items-center justify-center shadow-[0_0_18px_rgba(124,58,237,0.35)] flex-shrink-0">
+                <User size={17} className="text-white" />
               </div>
-              <blockquote className="text-white/60 text-sm leading-relaxed border-l-2 border-[#7C3AED]/50 pl-4">
-                "We built this community so every student in Yavatmal can access the same world-class cloud learning opportunities as anyone, anywhere."
-              </blockquote>
-            </div>
-
-            {/* Contact */}
-            <div className="liquid-glass rounded-2xl p-6 border border-white/8 hover:border-white/15 transition-all duration-300">
-              <p className="text-white/50 text-xs font-semibold tracking-widest uppercase mb-5">Get in Touch</p>
-
-              <div className="space-y-4">
-                <a href="tel:+919156332109" className="flex items-center gap-3 group">
-                  <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-[#00CFFF]/40 group-hover:bg-[#00CFFF]/8 transition-all flex-shrink-0">
-                    <Phone size={15} className="text-white/60 group-hover:text-[#00CFFF] transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium group-hover:text-[#00CFFF] transition-colors">+91 91563 32109</p>
-                    <p className="text-white/35 text-xs">AWS Student Builder Group Lead</p>
-                  </div>
-                </a>
-
-                <a href="https://swarajyahackfest.vercel.app" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
-                  <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-[#00CFFF]/40 group-hover:bg-[#00CFFF]/8 transition-all flex-shrink-0">
-                    <Globe size={15} className="text-white/60 group-hover:text-[#00CFFF] transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-[#00CFFF] text-sm font-medium group-hover:underline">swarajyahackfest.vercel.app</p>
-                    <p className="text-white/35 text-xs">Official Website</p>
-                  </div>
-                </a>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
-                    <MapPin size={15} className="text-white/60" />
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">Yavatmal, Maharashtra</p>
-                    <p className="text-white/35 text-xs">JDIET · Yavatmal's First Global Cloud Community</p>
-                  </div>
-                </div>
+              <div>
+                <p className="text-white font-semibold text-sm">Pranav Shinde</p>
+                <p className="text-white/40 text-xs">Founder · AWS Student Builder Group at JDIET</p>
               </div>
             </div>
+            <blockquote className="text-white/60 text-sm leading-relaxed border-l-2 border-[#7C3AED]/50 pl-4">
+              "We built this community so every student in Yavatmal can access the same world-class cloud learning opportunities as anyone, anywhere."
+            </blockquote>
           </div>
 
           {/* Right — Social icons: 1 row on all screens */}
@@ -173,6 +134,17 @@ export default function ConnectSection() {
               Click any icon to connect with the community
             </p>
           </div>
+        </div>
+
+        {/* New CTA Footer */}
+        <div className="mt-16 text-center">
+          <Link
+            to="/auth?signup=true"
+            className="liquid-glass inline-flex items-center gap-3 bg-white/5 border border-white/10 text-white px-8 py-3.5 rounded-full hover:bg-white/10 hover:border-[#7C3AED]/50 transition-all group"
+          >
+            <span className="font-semibold text-base">Ready to start building?</span>
+            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform text-[#7C3AED]" />
+          </Link>
         </div>
       </div>
 

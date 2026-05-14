@@ -1,24 +1,27 @@
+import { Link } from 'react-router-dom';
 import Hero from '../components/Hero';
 import SignupProcess from '../components/SignupProcess';
-import Benefits from '../components/Benefits';
-import FeatureDemo from '../components/FeatureDemo';
+import FeaturesSection from '../components/FeaturesSection';
 import ConnectSection from '../components/ConnectSection';
 import ArtSection from '../components/ArtSection';
-import GoodiesSection from '../components/GoodiesSection';
+import BadgesSection from '../components/BadgesSection';
 import Footer from '../components/Footer';
+import SwagSection from '../components/SwagSection';
 
 export default function Home() {
   return (
     // pb-28 ensures content isn't hidden behind mobile bottom nav
     <div className="bg-[#0B0F1A] min-h-screen pb-28 md:pb-0">
       <Hero />
+      <SwagSection />
       <SignupProcess />
-      <Benefits />
-      <FeatureDemo />
-      <ConnectSection />
+      <BadgesSection />
+
+      <FeaturesSection />
       <ArtSection />
-      <GoodiesSection />
+      <ConnectSection />
       <Footer />
     </div>
   );
 }
+
