@@ -4,6 +4,7 @@ import { Trophy, Award, Crown, Gift, Search, Medal, ArrowLeft, X } from 'lucide-
 import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import Footer from '../components/Footer';
+import staticWinners from '../data/giveaway_winners.json';
 
 interface StudentWinner {
   id: number;
@@ -62,31 +63,9 @@ export default function Winners() {
   }, []);
 
 
-  // Load giveaway winners from localStorage
+  // Load static giveaway winners (finalized and archived)
   useEffect(() => {
-    const saved = localStorage.getItem('giveaway_winners');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const normalized = parsed.map((w: any, idx: number) => {
-            let r = w.round !== undefined ? Number(w.round) : undefined;
-            if (r === undefined || isNaN(r)) {
-              r = Math.floor(idx / 50) + 1;
-            }
-            return {
-              id: w.id || 0,
-              name: w.name || 'Anonymous',
-              alias: w.alias || w.roll?.replace(/^@/, '') || 'unknown',
-              round: r
-            };
-          });
-          setGiveawayWinners(normalized);
-        }
-      } catch (e) {
-        console.error("Failed to parse giveaway winners", e);
-      }
-    }
+    setGiveawayWinners(staticWinners as StudentWinner[]);
   }, []);
 
   // Top 5 Main Winners (Referral Champions)

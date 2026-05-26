@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { Gift, Award, RotateCcw, AlertTriangle, ArrowRight, Loader2, Trophy, ArrowUpRight } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
+import staticWinners from '../data/giveaway_winners.json';
 
 interface Student {
   id: number;
@@ -118,8 +119,8 @@ export default function Giveaway() {
   const [winners, setWinners] = useState<Student[]>([]);
   const [currentRound, setCurrentRound] = useState<number>(1);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
-  const [scrollingName, setScrollingName] = useState<string>('Ready to Roll?');
-  const [scrollingAlias, setScrollingAlias] = useState<string>('@alias');
+  const [scrollingName, setScrollingName] = useState<string>('🎉 DRAW FINALIZED');
+  const [scrollingAlias, setScrollingAlias] = useState<string>('All 150 Winners Permanently Locked!');
   
   // Modal states
   const [showCompleteModal, setShowCompleteModal] = useState<boolean>(false);
@@ -223,32 +224,9 @@ export default function Giveaway() {
 
     setStudents(authenticPool);
 
-    // Check if there are saved winners in localStorage
-    const savedWinners = localStorage.getItem('giveaway_winners');
-    if (savedWinners) {
-      try {
-        const parsed = JSON.parse(savedWinners);
-        if (Array.isArray(parsed)) {
-          const normalized = parsed.map((w: any, idx: number) => {
-            let r = w.round !== undefined ? Number(w.round) : undefined;
-            if (r === undefined || isNaN(r)) {
-              r = Math.floor(idx / 50) + 1;
-            }
-            return {
-              id: w.id || 0,
-              name: w.name || 'Anonymous',
-              alias: w.alias || w.roll?.replace(/^@/, '') || 'unknown',
-              round: r
-            };
-          });
-          setWinners(normalized);
-          const roundCount = Math.floor(normalized.length / 50) + 1;
-          setCurrentRound(Math.min(roundCount, 4));
-        }
-      } catch (e) {
-        console.error("Failed to parse saved winners", e);
-      }
-    }
+    // Load static winners directly from the finalized file
+    setWinners(staticWinners as Student[]);
+    setCurrentRound(4);
 
 
 
@@ -522,9 +500,9 @@ export default function Giveaway() {
 
               <button
                 onClick={handleReset}
-                disabled={isDrawing}
-                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 text-white/50 hover:text-red-400 transition-all text-sm font-semibold flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Reset entire draw"
+                disabled={true}
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl border border-white/5 bg-white/5 text-white/20 cursor-not-allowed transition-all text-sm font-semibold flex items-center justify-center gap-2"
+                title="Reset Disabled - Draw Finalized"
               >
                 <RotateCcw size={16} /> Reset
               </button>
