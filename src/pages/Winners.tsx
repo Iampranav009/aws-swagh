@@ -16,7 +16,6 @@ export default function Winners() {
   const { leaderboard, loading } = useLeaderboard();
   
   const [giveawayWinners, setGiveawayWinners] = useState<StudentWinner[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'round1' | 'round2' | 'round3'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modal states
@@ -70,12 +69,18 @@ export default function Winners() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const normalized = parsed.map((w: any) => ({
-            id: w.id || 0,
-            name: w.name || 'Anonymous',
-            alias: w.alias || w.roll?.replace(/^@/, '') || 'unknown',
-            round: w.round
-          }));
+          const normalized = parsed.map((w: any, idx: number) => {
+            let r = w.round !== undefined ? Number(w.round) : undefined;
+            if (r === undefined || isNaN(r)) {
+              r = Math.floor(idx / 50) + 1;
+            }
+            return {
+              id: w.id || 0,
+              name: w.name || 'Anonymous',
+              alias: w.alias || w.roll?.replace(/^@/, '') || 'unknown',
+              round: r
+            };
+          });
           setGiveawayWinners(normalized);
         }
       } catch (e) {
@@ -94,23 +99,7 @@ export default function Winners() {
 
 
 
-  // Filtered Giveaway Winners
-  const filteredGiveaway = giveawayWinners.filter(w => {
-    // Round tab filter
-    if (activeTab === 'round1' && w.round !== 1) return false;
-    if (activeTab === 'round2' && w.round !== 2) return false;
-    if (activeTab === 'round3' && w.round !== 3) return false;
-    
-    // Search query filter
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
-      return (
-        (w.name || '').toLowerCase().includes(q) ||
-        (w.alias || '').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+
   const isTop5 = selectedWinner && selectedWinner.type === 'top5';
   const rank = isTop5 ? selectedWinner?.rank : null;
   // Modal styles based on rank
@@ -366,44 +355,19 @@ export default function Winners() {
               </span>
             </div>
 
-            {/* Filter and search controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              {/* Search box */}
-              <div className="relative">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-                  size={14}
-                />
-                <input
-                  type="text"
-                  placeholder="Search winners..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full sm:w-48 pl-9 pr-4 py-1.5 bg-black/30 border border-white/15 rounded-xl text-xs text-white focus:outline-none focus:border-[#7C3AED]/50 focus:ring-1 focus:ring-[#7C3AED]/50"
-                />
-              </div>
-
-              {/* Tabs */}
-              <div className="flex bg-black/40 border border-white/5 p-1 rounded-xl gap-1 shrink-0">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: 'round1', label: 'R1' },
-                  { id: 'round2', label: 'R2' },
-                  { id: 'round3', label: 'R3' }
-                ].map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveTab(t.id as any)}
-                    className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                      activeTab === t.id
-                        ? 'bg-[#7C3AED] text-white'
-                        : 'text-white/40 hover:text-white/60'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+            {/* Search box */}
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                size={14}
+              />
+              <input
+                type="text"
+                placeholder="Search winners by name or alias..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full sm:w-64 pl-9 pr-4 py-1.5 bg-[#0a0d18] border border-white/10 rounded-xl text-xs text-white placeholder-white/30 focus:outline-none focus:border-[#7C3AED]/50 focus:ring-1 focus:ring-[#7C3AED]/50 animate-all duration-300"
+              />
             </div>
           </div>
 
@@ -415,29 +379,91 @@ export default function Winners() {
                 Winners will display here once the Giveaway page simulation has completed.
               </p>
             </div>
-          ) : filteredGiveaway.length === 0 ? (
-            <div className="text-center py-10 text-white/30 text-xs italic">
-              No matching winners found for "{searchQuery}".
-            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredGiveaway.map((winner, idx) => {
-                // Find the original index of the winner in the full giveawayWinners list
-                const originalIdx = giveawayWinners.findIndex(w => (w.alias || '').toUpperCase() === (winner.alias || '').toUpperCase());
-                const displayNum = originalIdx !== -1 ? originalIdx + 1 : idx + 1;
-                return (
-                  <div
-                    key={`${winner.alias}-${idx}`}
-                    className="flex items-center gap-3 p-3.5 rounded-xl border border-white/5 bg-[#0D1222]/40 hover:border-[#7C3AED]/50 hover:bg-[#0D1222]/80 cursor-pointer transition-all text-sm font-semibold truncate group"
-                    onClick={() => handleWinnerClick(winner, 'giveaway', winner.round || 1)}
-                  >
-                    <span className="text-[#7C3AED] font-mono font-bold">{displayNum}.</span>
-                    <span className="text-white group-hover:text-orange-400 transition-colors truncate">{winner.name}</span>
-                    <span className="text-[#00CFFF] font-mono text-xs ml-auto shrink-0">@{winner.alias}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              {/* Desktop View: 3-column side-by-side (scrollbars hidden/removed completely) */}
+              <div className="hidden md:grid grid-cols-3 gap-6">
+                {[1, 2, 3].map(roundNum => {
+                  const roundWinners = giveawayWinners.filter(w => w.round === roundNum);
+                  const filteredRoundWinners = roundWinners.filter(w => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (w.name || '').toLowerCase().includes(q) ||
+                      (w.alias || '').toLowerCase().includes(q)
+                    );
+                  });
+                  
+                  return (
+                    <div key={roundNum} className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between px-1 border-b border-white/5 pb-1.5">
+                        <span className="text-xs font-bold tracking-wider uppercase text-white/50">Round {roundNum}</span>
+                        <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">
+                          {roundNum === 1 ? '1 to 50' : roundNum === 2 ? '51 to 100' : '101 to 150'}
+                        </span>
+                      </div>
+                      
+                      <div 
+                        className={`flex flex-col gap-2 p-3 rounded-2xl border min-h-[120px] ${
+                          roundNum === 1 ? 'border-cyan-500/20 bg-cyan-500/5 text-cyan-400' :
+                          roundNum === 2 ? 'border-orange-500/20 bg-orange-500/5 text-orange-400' :
+                          'border-purple-500/20 bg-purple-500/5 text-purple-400'
+                        }`}
+                      >
+                        {filteredRoundWinners.length === 0 ? (
+                          <span className="text-xs text-white/30 italic py-6 text-center">
+                            {searchQuery.trim() ? 'No matches found' : 'Round winners will appear here once drawn...'}
+                          </span>
+                        ) : (
+                          filteredRoundWinners.map((winner, idx) => {
+                            const displayNum = (roundNum - 1) * 50 + idx + 1;
+                            return (
+                              <div
+                                key={`${winner.alias}-${idx}`}
+                                className="flex items-center gap-3 p-3.5 rounded-xl border border-white/5 bg-[#0D1222]/40 hover:border-[#7C3AED]/50 hover:bg-[#0D1222]/80 cursor-pointer transition-all text-sm font-semibold truncate group"
+                                onClick={() => handleWinnerClick(winner, 'giveaway', roundNum)}
+                              >
+                                <span className="text-[#7C3AED] font-mono font-bold">{displayNum}.</span>
+                                <span className="text-white group-hover:text-orange-400 transition-colors truncate">{winner.name}</span>
+                                <span className="text-[#00CFFF] font-mono text-xs ml-auto shrink-0">@{winner.alias}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Mobile View: Single vertical row list from 1 to 150 in a single column */}
+              <div className="grid md:hidden grid-cols-1 gap-2.5">
+                {giveawayWinners
+                  .map((winner, idx) => ({ ...winner, originalIdx: idx }))
+                  .filter(w => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (w.name || '').toLowerCase().includes(q) ||
+                      (w.alias || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((winner) => {
+                    const displayNum = winner.originalIdx + 1;
+                    return (
+                      <div
+                        key={`${winner.alias}-${winner.originalIdx}`}
+                        className="flex items-center gap-3 p-3.5 rounded-xl border border-white/5 bg-[#0D1222]/40 hover:border-[#7C3AED]/50 hover:bg-[#0D1222]/80 cursor-pointer transition-all text-sm font-semibold truncate group"
+                        onClick={() => handleWinnerClick(winner, 'giveaway', winner.round || 1)}
+                      >
+                        <span className="text-[#7C3AED] font-mono font-bold">{displayNum}.</span>
+                        <span className="text-white group-hover:text-orange-400 transition-colors truncate">{winner.name}</span>
+                        <span className="text-[#00CFFF] font-mono text-xs ml-auto shrink-0">@{winner.alias}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
           )}
         </section>
       </div>

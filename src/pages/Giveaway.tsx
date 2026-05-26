@@ -125,30 +125,103 @@ export default function Giveaway() {
   const [showCompleteModal, setShowCompleteModal] = useState<boolean>(false);
   const [modalRound, setModalRound] = useState<number>(1);
 
-  // Total participant count animation state
-  const [displayParticipantsCount, setDisplayParticipantsCount] = useState<number>(0);
 
   // References for keeping track of selections
   const animationTimerRef = useRef<any | null>(null);
 
-  // Process live data into student pool (first 350 users minus top 5 leaderboard)
+  // Process live data into student pool with authenticity shortlisting
   useEffect(() => {
     if (dataLoading || allUsers.length === 0) return;
 
     // Identify top 5 performers to exclude
     const top5Aliases = new Set(leaderboard.slice(0, 5).map(u => u.alias.toUpperCase()));
 
-    // Slice first 350, then exclude the top 5
-    const first350 = allUsers.slice(0, 350);
-    const pool: Student[] = first350
-      .filter(u => !top5Aliases.has(u.alias.toUpperCase()))
-      .map((u, idx) => ({
-        id: idx + 1,
-        name: u.name || 'Anonymous Builder',
-        alias: u.alias
-      }));
+    // Compute duplicates across the entire spreadsheet to catch double submissions
+    const contactCounts: Record<string, number> = {};
+    const aliasCounts: Record<string, number> = {};
+    allUsers.forEach(u => {
+      const contact = (u.contact || '').trim();
+      if (contact && contact.length > 5) {
+        contactCounts[contact] = (contactCounts[contact] || 0) + 1;
+      }
+      const alias = (u.alias || '').trim().toUpperCase();
+      if (alias) {
+        aliasCounts[alias] = (aliasCounts[alias] || 0) + 1;
+      }
+    });
 
-    setStudents(pool);
+    // Helper for matching sheet name with official AWS profile name
+    const nameMatches = (sheetName: string, awsName: string): boolean => {
+      if (!awsName) return true; // fallback if AWS name is not retrieved
+      const cleanSheet = sheetName.toLowerCase().trim();
+      const cleanAws = awsName.toLowerCase().trim();
+      if (cleanSheet === cleanAws) return true;
+
+      const sheetWords = cleanSheet.split(/\s+/).filter(w => w.length >= 3);
+      const awsWords = cleanAws.split(/\s+/).filter(w => w.length >= 3);
+
+      if (sheetWords.length === 0 || awsWords.length === 0) {
+        return cleanSheet.includes(cleanAws) || cleanAws.includes(cleanSheet);
+      }
+
+      return sheetWords.some(sw => awsWords.some(aw => aw.includes(sw) || sw.includes(aw)));
+    };
+
+    // Main shortlisting selector function
+    const getShortlist = (sliceSize: number) => {
+      const candidates = allUsers.slice(0, sliceSize);
+      const authenticPool: Student[] = [];
+
+      candidates.forEach((u) => {
+        // Exclude the top 5 leaderboard champions
+        if (top5Aliases.has(u.alias.toUpperCase())) return;
+
+        // 1. Space in aliid (raw alias)
+        if (u.rawAlias && u.rawAlias.includes(' ')) return;
+
+        // 2. Dummy / Invalid Alias ID
+        const cleanAlias = (u.alias || '').trim().toUpperCase();
+        const invalidAliases = new Set(['-', 'NONE', 'NO', 'NA', 'N/A', 'NIL', 'NULL', 'UNDEFINED']);
+        if (!cleanAlias || invalidAliases.has(cleanAlias) || cleanAlias.length < 3) return;
+
+        // 3. Double Address (Duplicate Contact Number or Duplicate Alias Submission)
+        const contact = (u.contact || '').trim();
+        if (contact && contactCounts[contact] > 1) return;
+        if (cleanAlias && aliasCounts[cleanAlias] > 1) return;
+
+        // 4. Aliid / AWS name mismatch
+        if (u.nameOnAws) {
+          const isMatched = nameMatches(u.name, u.nameOnAws);
+          if (!isMatched) return;
+        }
+
+        // 5. Dummy / Invalid registered Name
+        const cleanName = (u.name || '').trim().toLowerCase();
+        if (cleanName.length < 3 || cleanName.includes('test') || cleanName.includes('admin') || cleanName.includes('anonymous')) return;
+
+        // 6. Dummy / Invalid registered Contact
+        if (contact && ['1234567890', '0000000000', '123456789', '9876543210'].includes(contact)) return;
+
+        // Passes all verification! Add to authentic candidate pool
+        authenticPool.push({
+          id: authenticPool.length + 1,
+          name: u.name || 'Anonymous Builder',
+          alias: u.alias
+        });
+      });
+
+      return authenticPool;
+    };
+
+    // Initially evaluate with the first 300 entries
+    let authenticPool = getShortlist(300);
+
+    // If authentic pool drops below 250, dynamically expand evaluation slice to 350
+    if (authenticPool.length < 250) {
+      authenticPool = getShortlist(350);
+    }
+
+    setStudents(authenticPool);
 
     // Check if there are saved winners in localStorage
     const savedWinners = localStorage.getItem('giveaway_winners');
@@ -156,12 +229,18 @@ export default function Giveaway() {
       try {
         const parsed = JSON.parse(savedWinners);
         if (Array.isArray(parsed)) {
-          const normalized = parsed.map((w: any) => ({
-            id: w.id || 0,
-            name: w.name || 'Anonymous',
-            alias: w.alias || w.roll?.replace(/^@/, '') || 'unknown',
-            round: w.round
-          }));
+          const normalized = parsed.map((w: any, idx: number) => {
+            let r = w.round !== undefined ? Number(w.round) : undefined;
+            if (r === undefined || isNaN(r)) {
+              r = Math.floor(idx / 50) + 1;
+            }
+            return {
+              id: w.id || 0,
+              name: w.name || 'Anonymous',
+              alias: w.alias || w.roll?.replace(/^@/, '') || 'unknown',
+              round: r
+            };
+          });
           setWinners(normalized);
           const roundCount = Math.floor(normalized.length / 50) + 1;
           setCurrentRound(Math.min(roundCount, 4));
@@ -171,22 +250,7 @@ export default function Giveaway() {
       }
     }
 
-    // Animated count to total user size
-    const end = allUsers.length;
-    const duration = 2000;
-    const startTime = performance.now();
 
-    const animateCount = (timestamp: number) => {
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayParticipantsCount(Math.floor(easeProgress * end));
-
-      if (progress < 1) {
-        requestAnimationFrame(animateCount);
-      }
-    };
-
-    requestAnimationFrame(animateCount);
 
     return () => {
       if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
@@ -349,10 +413,10 @@ export default function Giveaway() {
             🎉 Student Giveaway Draw
           </h1>
           <p className="text-sm sm:text-base md:text-xl text-white/70 max-w-2xl font-light">
-            <span className="font-bold text-orange-400 glow-text">{displayParticipantsCount.toLocaleString()}</span> participants · <span className="font-semibold text-white">150</span> winners · <span className="font-semibold text-white">3</span> rounds
+            <span className="font-bold text-orange-400 glow-text">{allUsers.length.toLocaleString()}</span> participants · <span className="font-semibold text-white">150</span> winners · <span className="font-semibold text-white">3</span> rounds
           </p>
           <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-xs text-white/50 tracking-wider">
-            Pool: first 350 spreadsheet entries (excluding top 5 leaderboard performers)
+            Campaign pool: registered AWS Builder ID entries
           </div>
 
           {/* Progress Bar Container */}
@@ -369,6 +433,7 @@ export default function Giveaway() {
             </div>
           </div>
         </header>
+
 
         {/* ── GOODIES CLAIM NOTICE (Responsive & Mobile Optimized) ── */}
         <section className="hidden md:flex w-full rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-orange-500/10 via-purple-600/10 to-transparent border border-white/10 shadow-xl flex-col md:flex-row items-stretch md:items-center justify-between gap-6 backdrop-blur-md">
@@ -520,6 +585,7 @@ export default function Giveaway() {
             })}
           </div>
         </section>
+
 
         {/* 4. Footer */}
         <footer className="w-full rounded-3xl p-5 sm:p-6 bg-white/[0.01] border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-6">

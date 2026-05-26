@@ -3,9 +3,11 @@ import { normalizeAlias, levenshtein } from './utils';
 export interface SheetUser {
   name: string;
   alias: string;
+  rawAlias: string;
   email?: string;
   contact?: string;
   referralCode: string;
+  nameOnAws?: string;
 }
 
 export interface LeaderboardEntry extends SheetUser {
@@ -94,12 +96,14 @@ export async function fetchUsers(): Promise<SheetUser[]> {
       const row = rows[i];
       const name         = (row[1] || '').trim();
       const email        = (row[2] || '').trim();
+      const rawAlias     = (row[3] || '').trim();
       const alias        = clean(row[3] || '');
       const contact      = (row[4] || '').trim();
       const referralCode = clean(row[5] || '');
+      const nameOnAws    = (row[14] || '').trim();
 
       if (alias) {
-        users.push({ name, alias, email, contact, referralCode });
+        users.push({ name, alias, rawAlias, email, contact, referralCode, nameOnAws });
       }
     }
 
