@@ -9,6 +9,9 @@ import Auth from './pages/Auth';
 import Notifications from './pages/Notifications';
 import Reward from './pages/Reward';
 import Rewards from './pages/Rewards';
+import Giveaway from './pages/Giveaway';
+import Winners from './pages/Winners';
+import GiveawayWinnersPopup from './components/GiveawayWinnersPopup';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Protects routes — redirects to /auth if not logged in
@@ -31,6 +34,7 @@ function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/reward" element={<Reward />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/giveaway" element={<Giveaway />} />
         
         {/* Protected — must be logged in */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -39,11 +43,15 @@ function AppRoutes() {
         <Route path="/rewards" element={<Rewards />} />
         {/* Public */}
         <Route path="/auth" element={<Auth />} />
+        <Route path="/winners" element={<Winners />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
       {/* Bottom nav only visible on mobile and only when logged in */}
       {!isAuthPage && <BottomNav />}
+
+      {/* Pop-up for first-time visitors */}
+      <GiveawayWinnersPopup />
     </div>
   );
 }

@@ -19,7 +19,7 @@ export default function TierToast({ referrals }: TierToastProps) {
       setVisible(true);
 
       if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setVisible(false), 4000);
+      timerRef.current = setTimeout(() => setVisible(false), 6000);
     }
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -85,7 +85,7 @@ export default function TierToast({ referrals }: TierToastProps) {
                 style={{ background: tier.color }}
                 initial={{ width: '100%' }}
                 animate={{ width:   '0%' }}
-                transition={{ duration: 4, ease: 'linear' }}
+                transition={{ duration: 6, ease: 'linear' }}
               />
             </div>
           </div>

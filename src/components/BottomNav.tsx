@@ -1,10 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2, LayoutDashboard, UserCircle2, Bell } from 'lucide-react';
+import { BarChart2, LayoutDashboard, UserCircle2, Bell, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 
-const SHOW_ON_PATHS = ['/leaderboard', '/dashboard', '/profile', '/notifications', '/rewards', '/reward'];
+const SHOW_ON_PATHS = ['/leaderboard', '/dashboard', '/profile', '/notifications', '/rewards', '/reward', '/winners', '/giveaway'];
 
 function useUnseenCount(userAlias: string) {
   const { leaderboard } = useLeaderboard();
@@ -44,6 +44,7 @@ export default function BottomNav() {
   const navItems = [
     { to: '/dashboard',     icon: LayoutDashboard, label: 'Home'    },
     { to: '/leaderboard',   icon: BarChart2,        label: 'Ranks'  },
+    { to: '/winners',       icon: Award,            label: 'Winners'},
     { to: '/notifications', icon: Bell,             label: 'Rewards', badge: unseenCount },
     { to: '/profile',       icon: UserCircle2,      label: 'Profile' },
   ];

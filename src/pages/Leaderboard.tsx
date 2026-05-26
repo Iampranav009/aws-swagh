@@ -1,15 +1,16 @@
 import LeaderboardTable from '../components/LeaderboardTable';
 import Sidebar from '../components/Sidebar';
+import Footer from '../components/Footer';
 
 export default function Leaderboard() {
   const userAlias = localStorage.getItem('aws_alias') || '';
 
   return (
-    <div className="bg-[#0B0F1A] h-screen pt-[72px] relative overflow-hidden flex flex-col">
-      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 overflow-hidden w-full">
+    <div className="bg-[#0B0F1A] min-h-screen md:h-screen pt-[72px] relative md:overflow-hidden flex flex-col">
+      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 md:overflow-hidden w-full">
         <Sidebar userAlias={userAlias} />
 
-        <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden relative">
+        <main className="flex-1 flex flex-col md:overflow-y-auto overflow-x-hidden relative">
           {/* Background decoration */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#00CFFF] rounded-full blur-[200px] opacity-[0.07] pointer-events-none" />
 
@@ -27,6 +28,7 @@ export default function Leaderboard() {
             </div>
             <LeaderboardTable />
           </div>
+          <Footer />
         </main>
       </div>
     </div>

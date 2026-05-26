@@ -41,11 +41,11 @@ export default function Hero() {
 
         <div className="flex flex-wrap items-center gap-4">
           <Link
-            to="/auth?signup=true"
+            to="/winners"
             className="liquid-glass relative group overflow-hidden bg-white/5 border border-white/10 flex items-center gap-2 text-white text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full hover:bg-white/10 hover:border-[#7C3AED]/50 transition-all duration-300"
           >
             <Trophy size={18} className="text-[#7C3AED]" />
-            Join Now
+            View Winners
           </Link>
           
           <Link

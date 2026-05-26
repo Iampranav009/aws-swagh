@@ -3,6 +3,7 @@ import { normalizeAlias, levenshtein } from './utils';
 export interface SheetUser {
   name: string;
   alias: string;
+  email?: string;
   contact?: string;
   referralCode: string;
 }
@@ -10,6 +11,7 @@ export interface SheetUser {
 export interface LeaderboardEntry extends SheetUser {
   points: number;
   referrals: number;
+  resolvedReferrerAlias?: string | null;
 }
 
 const API_KEY  = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY;
@@ -91,12 +93,13 @@ export async function fetchUsers(): Promise<SheetUser[]> {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const name         = (row[1] || '').trim();
+      const email        = (row[2] || '').trim();
       const alias        = clean(row[3] || '');
       const contact      = (row[4] || '').trim();
       const referralCode = clean(row[5] || '');
 
       if (alias) {
-        users.push({ name, alias, contact, referralCode });
+        users.push({ name, alias, email, contact, referralCode });
       }
     }
 
@@ -139,19 +142,22 @@ export function processLeaderboard(users: SheetUser[]): LeaderboardEntry[] {
 
     // Exact match first
     let referrer = map[refCode];
+    let resolvedReferrerAlias = referrer ? refCode : null;
 
     // Fuzzy fallback (minor typos)
     if (!referrer) {
       const fuzzy = fuzzyResolveAlias(refCode, knownAliases);
       if (fuzzy && fuzzy !== entry.alias) {
         referrer = map[fuzzy];
+        resolvedReferrerAlias = fuzzy;
       }
     }
 
-    if (!referrer) continue;
-
-    referrer.referrals += 1;
-    referrer.points    += 15;
+    if (referrer) {
+      referrer.referrals += 1;
+      referrer.points    += 15;
+      entry.resolvedReferrerAlias = resolvedReferrerAlias;
+    }
   }
 
   // ── Step 2.5: Special Manual Approval for YATHARTH29 ──────────────────────
@@ -163,12 +169,7 @@ export function processLeaderboard(users: SheetUser[]): LeaderboardEntry[] {
     // Track which unique users were already credited to him
     const alreadyCreditedAliases = new Set(
       Object.values(map)
-        .filter(entry => {
-          let refCode = entry.referralCode;
-          if (refCode === 'YATHARTH29') return true;
-          const fuzzy = fuzzyResolveAlias(refCode, Object.keys(map));
-          return fuzzy === 'YATHARTH29';
-        })
+        .filter(entry => entry.resolvedReferrerAlias === 'YATHARTH29')
         .map(entry => entry.alias)
     );
 

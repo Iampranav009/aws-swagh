@@ -18,7 +18,7 @@ const SOCIAL_LINKS = [
   },
   {
     label: 'WhatsApp',
-    href: 'https://chat.whatsapp.com/DEw9MvyogHH8OXj8Qce8d7',
+    href: 'https://chat.whatsapp.com/GAfhZWodmWy7DObGfVfJ1q',
     hoverGlow: 'rgba(37,211,102,0.3)',
     hoverBorder: 'hover:border-[#25D366]/50',
     hoverText: 'hover:text-[#25D366]',

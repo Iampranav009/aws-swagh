@@ -280,11 +280,11 @@ export default function Notifications() {
   const unseenCount = unlocked.filter(m => !seen.has(m.id)).length;
 
   return (
-    <div className="bg-[#0B0F1A] h-screen pt-[72px] relative overflow-hidden flex flex-col">
-      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 overflow-hidden w-full">
+    <div className="bg-[#0B0F1A] min-h-screen md:h-screen pt-[72px] relative md:overflow-hidden flex flex-col">
+      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 md:overflow-hidden w-full">
         <Sidebar userAlias={userAlias} setUserAlias={() => {}} />
 
-        <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 flex flex-col md:overflow-y-auto overflow-x-hidden">
           <div className="flex-1 p-4 sm:p-6 lg:p-8 w-full pb-28 md:pb-10">
 
           {/* Header */}

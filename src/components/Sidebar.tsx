@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Trophy, UserCircle2, BookOpen, Bell, Medal } from 'lucide-react';
+import { LayoutDashboard, Trophy, UserCircle2, BookOpen, Bell, Medal, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useAuth } from '../context/AuthContext';
@@ -49,6 +49,7 @@ export default function Sidebar({ userAlias = '', setUserAlias }: { userAlias?: 
     { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',   protected: true },
     { to: '/leaderboard',    icon: Trophy,           label: 'Leaderboard', protected: false },
     { to: '/rewards',        icon: Medal,            label: 'Rewards',     protected: false },
+    { to: '/winners',        icon: Award,            label: 'Winners',     protected: false },
     { to: '/notifications',  icon: Bell,             label: 'Notifications', badge: unseenCount, protected: true },
     { to: '/profile',        icon: UserCircle2,      label: 'Profile',       protected: true },
   ];

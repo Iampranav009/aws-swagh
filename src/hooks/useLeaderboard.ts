@@ -9,9 +9,9 @@ const fetcher = async () => {
 
 export function useLeaderboard() {
   const { data, error, isLoading, mutate } = useSWR('leaderboard-data', fetcher, {
-    refreshInterval: 2000,       // poll every 2 seconds for near-instant leaderboard updates
+    refreshInterval: 5000,       // poll every 5 seconds for near-instant leaderboard updates
     revalidateOnFocus: true,     // also refresh when user refocuses the tab
-    dedupingInterval: 1500,      // debounce duplicate requests within 1.5s
+    dedupingInterval: 4000,      // debounce duplicate requests within 4s
   });
 
   return {

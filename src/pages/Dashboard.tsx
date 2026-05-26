@@ -141,13 +141,13 @@ export default function Dashboard() {
     : 100;
 
   return (
-    <div className="bg-[#0B0F1A] h-screen pt-[72px] relative overflow-hidden flex flex-col">
-      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 overflow-hidden w-full">
+    <div className="bg-[#0B0F1A] min-h-screen md:h-screen pt-[72px] relative md:overflow-hidden flex flex-col">
+      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 md:overflow-hidden w-full">
         {/* Real-time tier unlock toast */}
         <TierToast referrals={referrals} />
         <Sidebar userAlias={userAlias} setUserAlias={setUserAlias} />
 
-        <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 flex flex-col md:overflow-y-auto overflow-x-hidden">
           <div className="flex-1 p-4 sm:p-6 lg:p-8 w-full pb-28 md:pb-10">
 
           {/* Welcome banner */}

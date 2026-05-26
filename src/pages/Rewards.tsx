@@ -30,12 +30,12 @@ export default function Rewards() {
 
   // Render Logged-in View
   return (
-    <div className="bg-[#0B0F1A] h-screen pt-[72px] relative overflow-hidden flex flex-col">
-      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 overflow-hidden w-full">
+    <div className="bg-[#0B0F1A] min-h-screen md:h-screen pt-[72px] relative md:overflow-hidden flex flex-col">
+      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 md:overflow-hidden w-full">
         <TierToast referrals={referrals} />
         <Sidebar userAlias={userAlias} setUserAlias={setUserAlias} />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 md:overflow-y-auto overflow-x-hidden">
           {/* Swag Pack Section at the top */}
           <div className="mb-10">
             <SwagSection />

@@ -24,6 +24,7 @@ export default function Navbar() {
     { label: 'Home', path: '/' },
     { label: 'Leaderboard', path: '/leaderboard' },
     { label: 'Rewards', path: user ? '/rewards' : '/reward' },
+    { label: 'Winners', path: '/winners' },
     ...(user ? [
       { label: 'Dashboard', path: '/dashboard' },
     ] : []),

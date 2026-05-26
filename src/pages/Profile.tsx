@@ -39,12 +39,12 @@ export default function Profile() {
 
   return (
     // ── Same layout shell as Dashboard & Leaderboard ──
-    <div className="bg-[#0B0F1A] h-screen pt-[72px] relative overflow-hidden flex flex-col">
-      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 overflow-hidden w-full">
+    <div className="bg-[#0B0F1A] min-h-screen md:h-screen pt-[72px] relative md:overflow-hidden flex flex-col">
+      <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row flex-1 md:overflow-hidden w-full">
         {/* Sidebar stays visible on desktop */}
         <Sidebar userAlias={userAlias} setUserAlias={setUserAlias} />
 
-        <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden relative">
+        <main className="flex-1 flex flex-col md:overflow-y-auto overflow-x-hidden relative">
           <div className="flex-1 p-4 sm:p-6 lg:p-8 w-full pb-28 md:pb-10 relative z-10">
 
           {/* ── Avatar + Name card ── */}

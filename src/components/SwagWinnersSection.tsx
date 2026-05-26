@@ -4,21 +4,21 @@ import { motion } from 'framer-motion';
 const RANK_DATA = [
   {
     rank: '1st Rank',
-    image: '/swag/img-1.png',
+    image: '/swag/img-1st.png',
     color: 'from-yellow-400 to-yellow-600',
     shadow: 'shadow-yellow-500/20',
     delay: 0.1
   },
   {
     rank: '2nd Rank',
-    image: '/swag/img-2.png',
+    image: '/swag/img-2nd.png',
     color: 'from-slate-300 to-slate-500',
     shadow: 'shadow-slate-400/20',
     delay: 0.2
   },
   {
     rank: '3rd Rank',
-    image: '/swag/img-3.png',
+    image: '/swag/img-3rd.png',
     color: 'from-orange-400 to-orange-600',
     shadow: 'shadow-orange-500/20',
     delay: 0.3
