@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Award, Sparkles, Trophy, Gift } from 'lucide-react';
+import { X, Award } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function GiveawayWinnersPopup() {
