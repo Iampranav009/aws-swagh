@@ -8,6 +8,7 @@ export interface SheetUser {
   contact?: string;
   referralCode: string;
   nameOnAws?: string;
+  builderCentralId?: string;
 }
 
 export interface LeaderboardEntry extends SheetUser {
@@ -89,21 +90,34 @@ export async function fetchUsers(): Promise<SheetUser[]> {
       return [];
     }
 
-    // Row 0 = headers, skip it
-    // Columns: 0=Timestamp, 1=Name, 2=Email, 3=Alias, 4=Phone, 5=ReferralCode
+    const headers = rows[0].map((header) => (header || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const findColumn = (names: string[], fallback: number) => {
+      const index = headers.findIndex((header) => names.some((name) => header.includes(name)));
+      return index >= 0 ? index : fallback;
+    };
+    const nameColumn = findColumn(['name'], 1);
+    const emailColumn = findColumn(['email'], 2);
+    const aliasColumn = findColumn(['aliasid', 'awsalias', 'aliid'], 3);
+    const contactColumn = findColumn(['phone', 'contact', 'mobile'], 4);
+    const referralColumn = findColumn(['referralcode', 'referralid', 'referredby'], 5);
+    const builderIdColumn = findColumn(['buildercentralid', 'buildercenterid', 'builderid'], 6);
+    const awsNameColumn = findColumn(['nameonaws', 'awsprofilename'], 14);
+
+    // Row 0 contains headers; known legacy column positions remain as fallbacks.
     const users: SheetUser[] = [];
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const name         = (row[1] || '').trim();
-      const email        = (row[2] || '').trim();
-      const rawAlias     = (row[3] || '').trim();
-      const alias        = clean(row[3] || '');
-      const contact      = (row[4] || '').trim();
-      const referralCode = clean(row[5] || '');
-      const nameOnAws    = (row[14] || '').trim();
+      const name         = (row[nameColumn] || '').trim();
+      const email        = (row[emailColumn] || '').trim();
+      const rawAlias     = (row[aliasColumn] || '').trim();
+      const alias        = clean(row[aliasColumn] || '');
+      const contact      = (row[contactColumn] || '').trim();
+      const referralCode = clean(row[referralColumn] || '');
+      const nameOnAws    = (row[awsNameColumn] || '').trim();
+      const builderCentralId = (row[builderIdColumn] || '').trim();
 
       if (alias) {
-        users.push({ name, alias, rawAlias, email, contact, referralCode, nameOnAws });
+        users.push({ name, alias, rawAlias, email, contact, referralCode, nameOnAws, builderCentralId });
       }
     }
 

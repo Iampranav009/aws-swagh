@@ -1,53 +1,164 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { auth, googleProvider } from '../lib/firebase';
+import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { AuthUI } from '../components/ui/auth-fuse';
+import { useAuth } from '../context/AuthContext';
 
 export default function Auth() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const returnTo = new URLSearchParams(location.search).get('returnTo');
+
+  const [isSignup, setIsSignup] = useState(new URLSearchParams(location.search).get('signup') === 'true');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [alias, setAlias] = useState('');
+  const [referral, setReferral] = useState('');
+  const [showAliasModal, setShowAliasModal] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setIsSignup(new URLSearchParams(location.search).get('signup') === 'true');
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (returnTo?.startsWith('/')) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
+      if (localStorage.getItem('aws_alias')) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        setShowAliasModal(true);
+      }
+    }
+  }, [user, authLoading, navigate, returnTo]);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    
+    try {
+      // Persist the Firebase session across browser restarts on this device.
+      await setPersistence(auth, browserLocalPersistence);
+      if (isSignup) {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: name });
+        if (referral) {
+          localStorage.setItem('aws_referral', referral);
+        }
+        setShowAliasModal(true);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+        if (returnTo?.startsWith('/')) {
+          navigate(returnTo);
+          return;
+        }
+        if (!localStorage.getItem('aws_alias')) {
+          setShowAliasModal(true);
+        } else {
+          navigate('/dashboard');
+        }
+      }
+    } catch (err: any) {
+      const code = String(err?.code || '');
+      setError(
+        code === 'auth/invalid-credential'
+          ? 'Email/password login is not configured for this account, or the password is incorrect. If you created this account with Google, use “Continue with Google”.'
+          : err.message || 'Authentication failed'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithPopup(auth, googleProvider);
+      if (returnTo?.startsWith('/')) {
+        navigate(returnTo);
+        return;
+      }
+      if (!localStorage.getItem('aws_alias')) {
+        setShowAliasModal(true);
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0B0F1A] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background gradients */}
-      <div className="absolute top-[10%] left-[10%] w-[40%] h-[40%] rounded-full bg-[#7C3AED]/20 blur-[120px]" />
-      <div className="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-[#00CFFF]/20 blur-[120px]" />
+    <>
+      <AuthUI 
+        isSignIn={!isSignup}
+        onToggleForm={() => { setIsSignup(!isSignup); setError(''); }}
+        onSignIn={handleAuth}
+        onSignUp={handleAuth}
+        onGoogle={handleGoogle}
+        emailProps={{ value: email, onChange: e => setEmail(e.target.value) }}
+        passwordProps={{ value: password, onChange: e => setPassword(e.target.value) }}
+        nameProps={{ value: name, onChange: e => setName(e.target.value) }}
+        referralProps={{ value: referral, onChange: e => setReferral(e.target.value) }}
+        loading={loading}
+        error={error}
+        onBack={() => navigate('/')}
+      />
 
-      <div className="liquid-glass w-full max-w-md p-8 sm:p-10 rounded-[2rem] border border-white/10 shadow-2xl relative z-10 text-center">
-        <button 
-          onClick={() => navigate('/')}
-          className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors"
-          aria-label="Go back"
-        >
-          <ArrowLeft size={20} />
-        </button>
-
-        <div className="mt-4 mb-8 flex justify-center">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#00CFFF] flex items-center justify-center shadow-lg border border-white/20">
-            <span className="text-2xl">🚀</span>
+      {showAliasModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="liquid-glass w-full max-w-md p-8 rounded-3xl border border-white/10 shadow-2xl relative">
+            <h2 className="text-2xl font-bold text-foreground mb-2">AWS Alias Required</h2>
+            <p className="text-muted-foreground text-sm mb-6">
+              Please enter your AWS Alias User ID to continue. If you don't have one, you can{' '}
+              <a href="https://bit.ly/4cvi5S6" target="_blank" rel="noreferrer" className="text-white hover:underline font-medium">
+                create one here
+              </a>.
+            </p>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              let cleanAlias = alias.startsWith('@') ? alias.substring(1) : alias;
+              if (cleanAlias.trim()) {
+                localStorage.setItem('aws_alias', cleanAlias);
+                setShowAliasModal(false);
+                navigate('/dashboard');
+              }
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="modal-alias" className="block text-sm font-medium text-foreground mb-1">
+                    AWS Alias User ID
+                  </label>
+                  <input
+                    id="modal-alias"
+                    type="text"
+                    required
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
+                    placeholder="e.g. johndoe"
+                    className="flex h-10 w-full rounded-md border border-white/20 bg-black/50 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-white text-black hover:bg-white/90 h-10 px-4 py-2 rounded-md font-medium transition-colors"
+                >
+                  Save & Continue
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-
-        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-          Program Ended
-        </h2>
-        <p className="text-white/70 text-sm sm:text-base leading-relaxed mb-6">
-          This program has officially ended. Thank you to everyone who participated! 
-          Stay tuned for another exciting program coming soon.
-        </p>
-
-        <div className="space-y-4 border-t border-white/10 pt-6">
-          <p className="text-white/90 text-sm font-medium">
-            Till then, join our community to stay updated!
-          </p>
-          <a
-            href="https://chat.whatsapp.com/GAfhZWodmWy7DObGfVfJ1q"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:opacity-95 text-white font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(37,211,102,0.4)] flex items-center justify-center gap-2 group"
-          >
-            <MessageCircle size={18} />
-            Join WhatsApp Group
-          </a>
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

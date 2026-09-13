@@ -11,7 +11,10 @@ import Reward from './pages/Reward';
 import Rewards from './pages/Rewards';
 import Giveaway from './pages/Giveaway';
 import Winners from './pages/Winners';
-import GiveawayWinnersPopup from './components/GiveawayWinnersPopup';
+import SbclDashboard from './pages/SbclDashboard';
+import Join from './pages/Join';
+import AdminDashboard from './pages/AdminDashboard';
+import SbclVerify from './pages/SbclVerify';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Protects routes — redirects to /auth if not logged in
@@ -44,14 +47,22 @@ function AppRoutes() {
         {/* Public */}
         <Route path="/auth" element={<Auth />} />
         <Route path="/winners" element={<Winners />} />
+        <Route path="/sbcl/:sbclCode" element={<SbclDashboard />} />
+        <Route path="/join/:referralCode" element={<Join />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/invitations" element={<AdminDashboard view="invitations" />} />
+        <Route path="/admin/activity" element={<AdminDashboard view="activity" />} />
+        <Route path="/admin/signups" element={<AdminDashboard view="signups" />} />
+        <Route path="/admin/network" element={<AdminDashboard view="network" />} />
+        <Route path="/admin/exports" element={<AdminDashboard view="exports" />} />
+        <Route path="/sbcl/verify" element={<SbclVerify />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
       {/* Bottom nav only visible on mobile and only when logged in */}
       {!isAuthPage && <BottomNav />}
 
-      {/* Pop-up for first-time visitors */}
-      <GiveawayWinnersPopup />
+
     </div>
   );
 }
