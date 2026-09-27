@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthUI } from '../components/ui/auth-fuse';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export default function Auth() {
   const location = useLocation();
@@ -37,6 +37,10 @@ export default function Auth() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!isSupabaseConfigured) {
+      setError('Supabase is not configured in environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel settings.');
+      return;
+    }
     setLoading(true);
     
     try {
@@ -60,6 +64,10 @@ export default function Auth() {
 
   const handleGoogle = async () => {
     try {
+      if (!isSupabaseConfigured) {
+        setError('Supabase is not configured in environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel settings.');
+        return;
+      }
       if (returnTo?.startsWith('/')) localStorage.setItem('auth_return_to', returnTo);
       const { error: authError } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth` } });
       if (authError) throw authError;
