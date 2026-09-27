@@ -9,6 +9,22 @@ import { getTierForReferrals, getNextTier } from '../lib/tiers';
 import { normalizeAlias } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
+const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/FR4Oatt1VBu3LXw8E25LCx';
+
+function WhatsAppIcon({ size = 20, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.456h.005c6.554 0 11.89-5.336 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { leaderboard, allUsers, loading: dataLoading } = useLeaderboard();
@@ -271,10 +287,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ── Compact Stat Boxes ── */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5">
+          {/* ── Compact Stat Boxes & Community ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
             {/* Points */}
-            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden">
+            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden flex flex-col justify-between">
               <div className="absolute -right-4 -top-4 w-16 h-16 bg-[#7C3AED]/20 blur-2xl rounded-full" />
               <p className="text-white/40 text-[9px] sm:text-[10px] uppercase tracking-widest mb-2 font-semibold">Points</p>
               <p className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#00CFFF]">
@@ -282,7 +298,7 @@ export default function Dashboard() {
               </p>
             </div>
             {/* Referrals */}
-            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden">
+            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden flex flex-col justify-between">
               <div className="absolute -right-4 -top-4 w-16 h-16 bg-[#00CFFF]/10 blur-2xl rounded-full" />
               <p className="text-white/40 text-[9px] sm:text-[10px] uppercase tracking-widest mb-2 font-semibold">Referrals</p>
               <p className="text-2xl sm:text-3xl font-bold text-white">
@@ -290,7 +306,7 @@ export default function Dashboard() {
               </p>
             </div>
             {/* Rank */}
-            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden">
+            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden flex flex-col justify-between">
               <div className="absolute -right-4 -top-4 w-16 h-16 bg-[#FFB347]/10 blur-2xl rounded-full" />
               <p className="text-white/40 text-[9px] sm:text-[10px] uppercase tracking-widest mb-2 font-semibold">Rank</p>
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -303,6 +319,25 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
+            </div>
+            {/* WhatsApp Community Box (After Rank Box) */}
+            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute -right-4 -top-4 w-16 h-16 bg-[#25D366]/20 blur-2xl rounded-full pointer-events-none" />
+              <div>
+                <p className="text-white/40 text-[9px] sm:text-[10px] uppercase tracking-widest mb-1.5 font-semibold">Community</p>
+                <p className="text-[11px] sm:text-xs text-white/80 font-medium leading-tight">
+                  For updates and all, join the WhatsApp community.
+                </p>
+              </div>
+              <a
+                href={WHATSAPP_COMMUNITY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2.5 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold text-xs text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.99] transition-all shadow-md shadow-[#25D366]/20 group shrink-0"
+              >
+                <WhatsAppIcon size={15} className="shrink-0 transition-transform group-hover:scale-110" />
+                <span className="truncate">Join WhatsApp Community</span>
+              </a>
             </div>
           </div>
 
