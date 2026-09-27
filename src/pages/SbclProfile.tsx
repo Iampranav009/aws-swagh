@@ -7,35 +7,82 @@ import { buildSbclFormLink } from '../lib/sbclForms';
 import { supabase } from '../lib/supabase';
 import SbclWorkspaceNav from '../components/SbclWorkspaceNav';
 
+interface ProfileData {
+  user_id: string;
+  name: string;
+  alias_id: string;
+  referral_code: string;
+  form_slug: string;
+  sbcl_code: string;
+  builder_signup_url?: string;
+}
+
 export default function SbclProfile() {
-  const { sbclCode: routeCode = '' } = useParams(); const code = sanitizeReferralPart(routeCode, 3); const { user } = useAuth(); const navigate = useNavigate();
-  const [profile, setProfile] = useState<{
-    name: string;
-    alias_id: string;
-    referral_code: string;
-    form_slug: string;
-    builder_signup_url?: string;
-  } | null>(null);
+  const { sbclCode: routeCode = '' } = useParams();
+  const targetCode = (routeCode || '').trim().toUpperCase();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoadingProfile(false);
+      return;
+    }
+    setLoadingProfile(true);
+    setNotFound(false);
+
     Promise.all([
+      // 1. Fetch target profile matching the route's code or alias
       supabase
         .from('sbcl_profiles')
-        .select('name,alias_id,referral_code,form_slug,sbcl_code,builder_signup_url')
+        .select('user_id,name,alias_id,referral_code,form_slug,sbcl_code,builder_signup_url')
+        .or(`sbcl_code.ilike.${targetCode},alias_id.ilike.${targetCode},form_slug.ilike.${targetCode}`)
+        .maybeSingle(),
+      // 2. Fetch current user's profile
+      supabase
+        .from('sbcl_profiles')
+        .select('sbcl_code')
         .eq('user_id', user.id)
         .maybeSingle(),
+      // 3. Check if user is an admin
       supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle(),
-    ]).then(([p, a]) => {
-      setIsAdmin(Boolean(a.data));
-      if (p.data && (a.data || p.data.sbcl_code === code)) setProfile(p.data);
-      else if (!a.data) navigate('/auth', { replace: true });
-    });
-  }, [user, code, navigate]);
+    ])
+      .then(([workspaceProfile, myProfile, admin]) => {
+        const userIsAdmin = Boolean(admin.data);
+        setIsAdmin(userIsAdmin);
+
+        const target = workspaceProfile.data;
+        const myCode = myProfile.data?.sbcl_code;
+        const isOwner = Boolean(
+          myCode &&
+          target?.sbcl_code &&
+          myCode.toUpperCase() === target.sbcl_code.toUpperCase()
+        );
+
+        if (target && (userIsAdmin || isOwner)) {
+          setProfile(target);
+        } else if (!userIsAdmin && !isOwner) {
+          navigate('/auth', { replace: true });
+        } else if (!target) {
+          setNotFound(true);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load SBCL profile:', err);
+        setNotFound(true);
+      })
+      .finally(() => {
+        setLoadingProfile(false);
+      });
+  }, [user, targetCode, navigate]);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -43,14 +90,50 @@ export default function SbclProfile() {
     try {
       setSaving(true);
       setMessage('');
-      const { data, error } = await supabase.rpc('update_my_sbcl_profile', {
-        p_name: profile.name,
-        p_alias_id: profile.alias_id,
-        p_builder_signup_url: profile.builder_signup_url || null,
-      });
-      if (error) throw error;
-      setProfile((current) => (current ? { ...current, ...data } : current));
-      setMessage('Profile updated.');
+
+      const cleanName = profile.name.trim();
+      const cleanAlias = (profile.alias_id || '').toUpperCase().replace(/[^A-Za-z0-9]/g, '');
+      const cleanUrl = profile.builder_signup_url?.trim() || null;
+      const cleanSlug = cleanAlias.toLowerCase();
+
+      if (cleanName.length < 2) throw new Error('Enter your full name.');
+      if (cleanAlias.length < 2 || cleanAlias.length > 32) throw new Error('Enter a valid AWS Alias ID.');
+
+      if (isAdmin && user?.id !== profile.user_id) {
+        // Admin updating another leader's profile directly
+        const { error } = await supabase
+          .from('sbcl_profiles')
+          .update({
+            name: cleanName,
+            alias_id: cleanAlias,
+            form_slug: cleanSlug,
+            referral_code: cleanAlias,
+            builder_signup_url: cleanUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', profile.user_id);
+
+        if (error) throw error;
+        setProfile((current) => (current ? {
+          ...current,
+          name: cleanName,
+          alias_id: cleanAlias,
+          form_slug: cleanSlug,
+          referral_code: cleanAlias,
+          builder_signup_url: cleanUrl || undefined,
+        } : current));
+        setMessage('Profile updated successfully (Admin).');
+      } else {
+        // Profile owner updating their own profile
+        const { data, error } = await supabase.rpc('update_my_sbcl_profile', {
+          p_name: cleanName,
+          p_alias_id: cleanAlias,
+          p_builder_signup_url: cleanUrl,
+        });
+        if (error) throw error;
+        setProfile((current) => (current ? { ...current, ...data } : current));
+        setMessage('Profile updated successfully.');
+      }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Could not update profile.');
     } finally {
@@ -58,21 +141,38 @@ export default function SbclProfile() {
     }
   };
 
-  if (!user)
+  if (!user) {
     return (
       <div className="min-h-screen bg-[#070B14] pt-28 text-white text-center">
-        <Link to="/auth">Sign in</Link>
+        <Link to="/auth" className="text-[#00CFFF] hover:underline">Sign in to continue</Link>
       </div>
     );
-  if (!profile)
+  }
+
+  if (loadingProfile) {
     return (
       <div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white/40">
         Loading SBCL profile…
       </div>
     );
+  }
 
-  const formLink = buildSbclFormLink(profile.alias_id || profile.form_slug || code);
-  const previewSlug = (profile.alias_id || profile.form_slug || code).toLowerCase().replace(/^@/, '');
+  if (notFound || !profile) {
+    return (
+      <div className="min-h-screen bg-[#070B14] pt-28 text-white text-center px-4">
+        <h2 className="text-2xl font-bold mb-2">SBCL Profile Not Found</h2>
+        <p className="text-white/50 text-sm mb-6">Could not find an SBCL profile matching &quot;{routeCode}&quot;.</p>
+        <Link to="/admin" className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-all">
+          Back to Admin
+        </Link>
+      </div>
+    );
+  }
+
+  const code = profile.sbcl_code || sanitizeReferralPart(routeCode, 3);
+  const fullAliasSlug = (profile.alias_id || profile.form_slug || code).toLowerCase().replace(/^@/, '');
+  const formLink = buildSbclFormLink(fullAliasSlug);
+  const previewSlug = fullAliasSlug;
 
   return (
     <div className="min-h-screen bg-[#070B14] pt-24 pb-16 px-4 sm:px-6 text-white">
@@ -122,7 +222,7 @@ export default function SbclProfile() {
             {message && (
               <p
                 className={`text-sm mt-3 ${
-                  message.includes('updated') ? 'text-emerald-400' : 'text-red-400'
+                  message.includes('updated') || message.includes('successfully') ? 'text-emerald-400' : 'text-red-400'
                 }`}
               >
                 {message}
@@ -133,7 +233,7 @@ export default function SbclProfile() {
               className="mt-5 w-full rounded-xl bg-white text-black py-3 font-semibold flex items-center justify-center gap-2 hover:bg-white/90 transition-all disabled:opacity-50"
             >
               <Save size={16} />
-              {saving ? 'Saving…' : 'Save profile'}
+              {saving ? 'Saving…' : isAdmin && user?.id !== profile.user_id ? 'Save profile (Admin)' : 'Save profile'}
             </button>
           </form>
 
@@ -174,9 +274,9 @@ export default function SbclProfile() {
                 <p className="font-mono text-xs text-[#00CFFF] truncate">{profile.builder_signup_url}</p>
               </div>
             )}
-            {isAdmin && (
-              <p className="text-white/30 text-xs mt-5">
-                Admin preview mode. Profile changes are available only to the profile owner.
+            {isAdmin && user?.id !== profile.user_id && (
+              <p className="text-[#00CFFF]/70 text-xs mt-5">
+                Admin mode: You have full access to view and update this SBCL profile.
               </p>
             )}
           </section>
