@@ -83,7 +83,30 @@ export default function SbclReferralNetwork() {
   useEffect(() => {
     if (!user || (!isAdminAccess && assignedCode !== sbclCode)) return;
     loadSubReferralLinks(sbclCode).then(setSubLinks).catch(() => setSubLinks([]));
-  }, [user, isAdminAccess, assignedCode, sbclCode]);
+
+    // Supabase Realtime WebSocket for live sub-referrals and submissions
+    const channel = supabase
+      .channel(`sbcl_network_${sbclCode.toLowerCase()}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sub_referrals' },
+        () => {
+          loadSubReferralLinks(sbclCode).then(setSubLinks).catch(() => setSubLinks([]));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sbcl_form_submissions' },
+        () => {
+          refresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isAdminAccess, assignedCode, sbclCode, refresh]);
 
   // Categorize all referrals for this SBCL
   const { allSignups, directSignups, subReferralSignups, subNetwork } = useMemo(

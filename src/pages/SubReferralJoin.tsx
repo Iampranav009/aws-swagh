@@ -77,6 +77,46 @@ export default function SubReferralJoin() {
     loadSbcl();
   }, [cleanParam]);
 
+  // Auto-complete registration if user returns from Google OAuth
+  useEffect(() => {
+    if (!user || !sbclInfo || registered || submitting) return;
+    const storedAlias = normalizeAlias(localStorage.getItem('aws_alias') || alias);
+    const pendingOauth = localStorage.getItem('pending_sub_oauth');
+    if (pendingOauth === 'true' && storedAlias) {
+      localStorage.removeItem('pending_sub_oauth');
+      setSubmitting(true);
+      const displayName = user.user_metadata?.full_name || user.user_metadata?.name || storedAlias;
+      (async () => {
+        try {
+          const { error: rpcErr } = await supabase.rpc('register_sub_referral', {
+            p_sbcl_code: sbclInfo.sbcl_code,
+            p_name: displayName,
+            p_alias: storedAlias,
+          });
+          if (rpcErr) {
+            console.warn('RPC register fallback after OAuth:', rpcErr);
+            await supabase.from('sub_referrals').upsert({
+              code: storedAlias,
+              name: displayName,
+              sbcl_code: sbclInfo.sbcl_code,
+              link: `/f/${storedAlias.toLowerCase()}`,
+              created_by: user.id,
+              created_at: new Date().toISOString(),
+            }, { onConflict: 'code' });
+          }
+        } catch (e) {
+          console.error('Auto-registration error after OAuth:', e);
+        } finally {
+          localStorage.setItem('aws_alias', storedAlias);
+          localStorage.setItem('sub_referrer_sbcl', sbclInfo.sbcl_code);
+          setRegistered(true);
+          setSubmitting(false);
+          setTimeout(() => navigate('/dashboard'), 1200);
+        }
+      })();
+    }
+  }, [user, sbclInfo, registered, submitting, alias, navigate]);
+
   // If user is already logged in, check if we can register their alias directly
   const handleExistingUserJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,14 +132,25 @@ export default function SubReferralJoin() {
       setSubmitting(true);
       setFormError('');
 
-      const displayName = name.trim() || user.user_metadata?.full_name || cleanAlias;
+      const displayName = name.trim() || user.user_metadata?.full_name || user.user_metadata?.name || cleanAlias;
       const { error: rpcError } = await supabase.rpc('register_sub_referral', {
         p_sbcl_code: sbclInfo.sbcl_code,
         p_name: displayName,
         p_alias: cleanAlias,
       });
 
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        console.warn('RPC register error, performing direct upsert:', rpcError);
+        const { error: upsertErr } = await supabase.from('sub_referrals').upsert({
+          code: cleanAlias,
+          name: displayName,
+          sbcl_code: sbclInfo.sbcl_code,
+          link: `/f/${cleanAlias.toLowerCase()}`,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'code' });
+        if (upsertErr) throw upsertErr;
+      }
 
       localStorage.setItem('aws_alias', cleanAlias);
       localStorage.setItem('sub_referrer_sbcl', sbclInfo.sbcl_code);
@@ -148,16 +199,26 @@ export default function SubReferralJoin() {
 
         if (signUpError) throw signUpError;
 
-        if (authData.user) {
-          // Register sub-referral
-          await supabase.rpc('register_sub_referral', {
-            p_sbcl_code: sbclInfo.sbcl_code,
-            p_name: name.trim(),
-            p_alias: cleanAlias,
-          });
+        // Register sub-referral
+        const { error: rpcErr } = await supabase.rpc('register_sub_referral', {
+          p_sbcl_code: sbclInfo.sbcl_code,
+          p_name: name.trim(),
+          p_alias: cleanAlias,
+        });
+
+        if (rpcErr) {
+          console.warn('RPC register error on signup:', rpcErr);
+          await supabase.from('sub_referrals').upsert({
+            code: cleanAlias,
+            name: name.trim(),
+            sbcl_code: sbclInfo.sbcl_code,
+            link: `/f/${cleanAlias.toLowerCase()}`,
+            created_by: authData?.user?.id || null,
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'code' });
         }
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
@@ -165,11 +226,23 @@ export default function SubReferralJoin() {
         if (signInError) throw signInError;
 
         // Register / update sub-referral after sign in
-        await supabase.rpc('register_sub_referral', {
+        const { error: rpcErr } = await supabase.rpc('register_sub_referral', {
           p_sbcl_code: sbclInfo.sbcl_code,
           p_name: name.trim() || cleanAlias,
           p_alias: cleanAlias,
         });
+
+        if (rpcErr) {
+          console.warn('RPC register error on sign-in:', rpcErr);
+          await supabase.from('sub_referrals').upsert({
+            code: cleanAlias,
+            name: name.trim() || cleanAlias,
+            sbcl_code: sbclInfo.sbcl_code,
+            link: `/f/${cleanAlias.toLowerCase()}`,
+            created_by: signInData?.user?.id || null,
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'code' });
+        }
       }
 
       localStorage.setItem('aws_alias', cleanAlias);
@@ -186,10 +259,13 @@ export default function SubReferralJoin() {
   const handleGoogleSignIn = async () => {
     if (!sbclInfo) return;
     const cleanAlias = normalizeAlias(alias);
-    if (cleanAlias) {
-      localStorage.setItem('aws_alias', cleanAlias);
+    if (!cleanAlias) {
+      setFormError('Please enter your AWS Alias ID first before continuing with Google.');
+      return;
     }
+    localStorage.setItem('aws_alias', cleanAlias);
     localStorage.setItem('sub_referrer_sbcl', sbclInfo.sbcl_code);
+    localStorage.setItem('pending_sub_oauth', 'true');
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.href },

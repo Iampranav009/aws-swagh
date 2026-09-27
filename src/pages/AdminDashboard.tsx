@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Copy, Database, Download, Link2, Network, Search, ShieldCheck, Trash2, Users, Zap } from 'lucide-react';
+import { Check, Copy, Database, Download, Link2, Network, RefreshCw, Search, ShieldCheck, Trash2, Users, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { usePrivateSignupRows } from '../hooks/useLeaderboard';
@@ -28,11 +28,12 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
   const [registrySourceFilter, setRegistrySourceFilter] = useState('all');
   const [loadingRegistry, setLoadingRegistry] = useState(false);
   const [copied, setCopied] = useState('');
+  const [realtimeActive, setRealtimeActive] = useState(false);
 
   const loadAdminData = async () => {
     try {
       const [profilesRes, subsRes, invitesRes] = await Promise.all([
-        supabase.from('sbcl_profiles').select('*').order('sbcl_code'),
+        supabase.from('sbcl_profiles').select('*').order('created_at', { ascending: true }),
         supabase.from('sub_referrals').select('*').order('created_at', { ascending: false }),
         supabase.from('sbcl_invites').select('*').order('created_at', { ascending: false }),
       ]);
@@ -62,10 +63,72 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
   };
 
   useEffect(() => {
-    if (isAdmin) {
+    if (!isAdmin) return;
+
+    loadAdminData();
+
+    // Supabase Realtime WebSocket subscription for live updates
+    const channel = supabase
+      .channel('admin_realtime_ws')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sbcl_invites' },
+        (payload) => {
+          console.log('[Realtime WS] sbcl_invites change:', payload.eventType);
+          loadAdminData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sbcl_profiles' },
+        (payload) => {
+          console.log('[Realtime WS] sbcl_profiles change:', payload.eventType);
+          loadAdminData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sub_referrals' },
+        (payload) => {
+          console.log('[Realtime WS] sub_referrals change:', payload.eventType);
+          loadAdminData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sbcl_form_submissions' },
+        (payload) => {
+          console.log('[Realtime WS] sbcl_form_submissions change:', payload.eventType);
+          loadAdminData();
+          refresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'signups' },
+        (payload) => {
+          console.log('[Realtime WS] signups change:', payload.eventType);
+          refresh();
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setRealtimeActive(true);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setRealtimeActive(false);
+        }
+      });
+
+    // 5-second polling interval as an unbreakable fallback
+    const interval = setInterval(() => {
       loadAdminData();
-    }
-  }, [isAdmin]);
+    }, 5000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [isAdmin, refresh]);
 
   useEffect(() => {
     if (isAdmin && (view === 'registry' || view === 'overview')) {
@@ -308,7 +371,29 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
       <AdminSidebar />
       <main className="flex-1 min-w-0">
         <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
-          <div><p className="text-orange-400 text-xs font-semibold tracking-[.24em] uppercase mb-3">Admin control room</p><h1 className="text-4xl sm:text-6xl leading-none">{titles[view][0]}</h1><p className="text-white/50 mt-4">{titles[view][1]}</p></div>
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-orange-400 text-xs font-semibold tracking-[.24em] uppercase">Admin control room</p>
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors ${
+                realtimeActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${realtimeActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>{realtimeActive ? 'Live WebSocket Active' : 'Connecting WebSocket…'}</span>
+              </div>
+            </div>
+            <h1 className="text-4xl sm:text-6xl leading-none">{titles[view][0]}</h1>
+            <p className="text-white/50 mt-4">{titles[view][1]}</p>
+          </div>
+          <button
+            onClick={() => { loadAdminData(); refresh(); }}
+            className="self-start lg:self-auto px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-medium transition-all flex items-center gap-1.5"
+            title="Force refresh now"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            <span>Sync now</span>
+          </button>
         </header>
 
         {view === 'overview' && (
