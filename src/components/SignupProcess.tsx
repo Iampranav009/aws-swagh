@@ -1,16 +1,11 @@
-import { ExternalLink, UserPlus, User, QrCode, Copy, FileText, CheckCircle2 } from 'lucide-react';
-import { useState } from 'react';
+import { ExternalLink, UserPlus, User, QrCode, Copy, FileText } from 'lucide-react';
 
 export default function SignupProcess() {
-  const [copiedLink, setCopiedLink] = useState<string | null>(null);
-
   const steps = [
     { 
       icon: ExternalLink, 
       title: "Open Link", 
       desc: "Visit the registration portal.", 
-      link: "https://bit.ly/4cvi5S6",
-      action: "Open Link"
     },
     { 
       icon: UserPlus, 
@@ -35,17 +30,9 @@ export default function SignupProcess() {
     { 
       icon: FileText, 
       title: "Submit Form", 
-      desc: "Fill the final Google form.", 
-      link: "https://forms.gle/PGhwQvEUXNwWFJ7L7",
-      action: "Open Form"
+      desc: "Submit your alias in the registration form.", 
     },
   ];
-
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedLink(id);
-    setTimeout(() => setCopiedLink(null), 2000);
-  };
 
   return (
     <section className="py-24 px-6 relative overflow-hidden bg-black/20">
@@ -73,33 +60,7 @@ export default function SignupProcess() {
               </div>
               
               <h3 className="text-white font-bold text-sm mb-2">{step.title}</h3>
-              <p className="text-white/40 text-[11px] leading-relaxed mb-4 min-h-[32px]">{step.desc}</p>
-              
-              {step.link ? (
-                <div className="mt-auto w-full flex flex-col gap-2">
-                  <a 
-                    href={step.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full py-2 bg-[#00CFFF]/10 hover:bg-[#00CFFF]/20 border border-[#00CFFF]/20 text-[#00CFFF] text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <ExternalLink size={12} />
-                    {step.action}
-                  </a>
-                  <button 
-                    onClick={() => handleCopy(step.link!, `step-${idx}`)}
-                    className="text-[9px] text-white/30 hover:text-white/60 transition-colors flex items-center justify-center gap-1"
-                  >
-                    {copiedLink === `step-${idx}` ? (
-                      <><CheckCircle2 size={10} className="text-green-400" /> Copied</>
-                    ) : (
-                      <><Copy size={10} /> Copy URL</>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-auto h-[58px]" /> // Spacer to keep heights consistent
-              )}
+              <p className="text-white/40 text-[11px] leading-relaxed">{step.desc}</p>
             </div>
           ))}
         </div>

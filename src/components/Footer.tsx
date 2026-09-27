@@ -110,7 +110,7 @@ export default function Footer() {
       </div>
       
       <div className="max-w-6xl mx-auto text-center border-t border-white/10 pt-8 relative z-10">
-        <p className="text-white/50 text-sm mb-2">Winner Announcement Date: <span className="text-[#00CFFF] font-medium tracking-wide">June 15, 2026</span></p>
+        <p className="text-white/50 text-sm mb-2">Winner Announcement Date: <span className="text-[#00CFFF] font-medium tracking-wide">November 3, 2026</span></p>
         <p className="text-white/40 text-xs">&copy; 2026 AWS Student Builder Group at JDIET. All rights reserved.</p>
       </div>
     </footer>

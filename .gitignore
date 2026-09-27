@@ -13,6 +13,13 @@ dist-ssr
 *.local
 .env
 .env.*
+dataconnect/.dataconnect/
+.supabase/
+.env.supabase-admin
+.tmp/
+.playwright-cli/
+output/
+~$*
 
 # Editor directories and files
 .vscode/*

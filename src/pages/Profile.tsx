@@ -1,15 +1,24 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLeaderboard } from '../hooks/useLeaderboard';
-import { Copy, CheckCircle2, Crown, Medal, LogOut } from 'lucide-react';
+import { Copy, CheckCircle2, Crown, Medal, LogOut, Edit3, ShieldAlert, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import { normalizeAlias } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const { leaderboard } = useLeaderboard();
   const [userAlias, setUserAlias] = useState(localStorage.getItem('aws_alias') || '');
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
+  const [newAliasInput, setNewAliasInput] = useState('');
+  const [aliasError, setAliasError] = useState('');
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const navigate = useNavigate();
 
   const handleCopy = () => {
@@ -18,10 +27,101 @@ export default function Profile() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleUnlink = () => {
-    localStorage.removeItem('aws_alias');
-    setUserAlias('');
-    navigate('/dashboard');
+  const referralFormUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/f/${userAlias ? userAlias.toLowerCase() : ''}`
+    : `/f/${userAlias ? userAlias.toLowerCase() : ''}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(referralFormUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleStartEdit = () => {
+    setNewAliasInput(userAlias);
+    setAliasError('');
+    setIsEditingAlias(true);
+    setSuccessMessage('');
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingAlias(false);
+    setNewAliasInput('');
+    setAliasError('');
+  };
+
+  const handleRequestChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAliasError('');
+    if (/\s/.test(newAliasInput)) {
+      setAliasError('Alias ID must not contain spaces. Please remove any spaces.');
+      return;
+    }
+    const cleanNew = normalizeAlias(newAliasInput);
+    if (!cleanNew || cleanNew.length < 2) {
+      setAliasError('Alias ID must be at least 2 characters long.');
+      return;
+    }
+    if (cleanNew.toUpperCase() === userAlias.toUpperCase()) {
+      setIsEditingAlias(false);
+      return;
+    }
+    // Show warning confirmation modal
+    setShowWarningModal(true);
+  };
+
+  const handleConfirmAliasChange = async () => {
+    const cleanNew = normalizeAlias(newAliasInput);
+    const oldAlias = userAlias;
+    if (!cleanNew) return;
+
+    try {
+      setIsUpdating(true);
+      // 1. Update localStorage
+      localStorage.setItem('aws_alias', cleanNew);
+      setUserAlias(cleanNew);
+
+      // 2. Update Supabase if user is authenticated
+      if (user) {
+        const realName = String(user.user_metadata?.full_name || user.user_metadata?.name || '').trim();
+        // Update sub_referrals
+        await supabase
+          .from('sub_referrals')
+          .update({
+            code: cleanNew,
+            link: `/f/${cleanNew.toLowerCase()}`,
+            name: realName || cleanNew,
+          })
+          .or(`created_by.eq.${user.id},code.ilike.${oldAlias}`);
+
+        // Update sbcl_profiles if applicable
+        await supabase
+          .from('sbcl_profiles')
+          .update({
+            alias_id: cleanNew,
+            form_slug: cleanNew.toLowerCase(),
+            referral_code: cleanNew,
+          })
+          .eq('user_id', user.id);
+
+        // Update user metadata in auth
+        await supabase.auth.updateUser({
+          data: { alias: cleanNew },
+        });
+      }
+
+      setShowWarningModal(false);
+      setIsEditingAlias(false);
+      setSuccessMessage(
+        `Your AWS Alias ID has been updated to @${cleanNew}. Your dedicated referral link is now: ${window.location.origin}/f/${cleanNew.toLowerCase()}`
+      );
+      setTimeout(() => setSuccessMessage(''), 8000);
+    } catch (err: any) {
+      setAliasError(err.message || 'Could not update Alias ID.');
+      setShowWarningModal(false);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -54,13 +154,13 @@ export default function Profile() {
               {/* Avatar circle */}
               <div className="w-16 h-16 rounded-full border-2 border-[#FFB347] flex items-center justify-center bg-[#0B0F1A] shadow-[0_0_20px_rgba(255,179,71,0.3)] shrink-0">
                 <span className="text-[#FFB347] font-bold text-2xl">
-                  {(user?.displayName || userAlias || '?').charAt(0).toUpperCase()}
+                  {(String(user?.user_metadata?.full_name || '') || userAlias || '?').charAt(0).toUpperCase()}
                 </span>
               </div>
               {/* Name + alias */}
               <div className="flex-1 min-w-0">
                 <h1 className="text-white font-bold text-xl sm:text-2xl leading-tight truncate">
-                  {user?.displayName || currentUserData?.name || 'Builder'}
+                  {String(user?.user_metadata?.full_name || '') || currentUserData?.name || 'Builder'}
                 </h1>
                 <p className="text-[#00CFFF] text-xs font-mono font-bold tracking-wider uppercase mt-0.5">
                   @{userAlias || '—'}
@@ -125,31 +225,142 @@ export default function Profile() {
             ))}
           </div>
 
-          {/* ── Referral Code (prominent copy) ── */}
-          <div className="liquid-glass rounded-2xl border border-white/10 p-5 shadow-xl mb-4">
-            <p className="text-white/40 text-[10px] uppercase tracking-widest mb-3">Your Referral Code</p>
-            <div className="flex items-stretch gap-2">
-              {/* Code display */}
-              <div className="flex-1 flex items-center px-4 py-3 bg-black/50 border border-white/10 rounded-xl">
-                <span className="text-[#00CFFF] font-mono font-bold text-base tracking-widest">@{userAlias || '—'}</span>
+          {/* ── Success banner if alias was changed ── */}
+          {successMessage && (
+            <div className="liquid-glass border border-green-500/30 bg-green-500/10 rounded-2xl p-4 mb-4 flex items-start gap-3">
+              <CheckCircle2 size={18} className="text-green-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-green-200">
+                {successMessage}
               </div>
-              {/* Copy button — clearly visible */}
-              <button
-                onClick={handleCopy}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all shrink-0 ${
-                  copied
-                    ? 'bg-green-500/20 border border-green-500/40 text-green-400'
-                    : 'bg-[#00CFFF]/15 border border-[#00CFFF]/30 text-[#00CFFF] hover:bg-[#00CFFF]/25'
-                }`}
-              >
-                {copied ? (
-                  <><CheckCircle2 size={16} /> Copied!</>
-                ) : (
-                  <><Copy size={16} /> Copy</>
-                )}
-              </button>
             </div>
-            <p className="text-white/30 text-[10px] text-center mt-2">Share this code to earn referral points</p>
+          )}
+
+          {/* ── Your AWS Alias ID (Change Alias ID with Warning Alert) ── */}
+          <div className="liquid-glass rounded-2xl border border-white/10 p-5 shadow-xl mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-white/40 text-[10px] uppercase tracking-widest font-semibold">Your AWS Alias ID</p>
+                <p className="text-white/40 text-[11px] mt-0.5">This is your unique Alias ID, not your referral code.</p>
+              </div>
+              {!isEditingAlias && (
+                <button
+                  type="button"
+                  onClick={handleStartEdit}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-[#00CFFF]/40 transition-all"
+                >
+                  <Edit3 size={13} className="text-[#00CFFF]" />
+                  Change Alias ID
+                </button>
+              )}
+            </div>
+
+            {isEditingAlias ? (
+              <form onSubmit={handleRequestChange} className="mt-3 flex flex-col gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-white/70 mb-1">
+                    New Alias ID
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 font-mono text-sm">@</span>
+                    <input
+                      type="text"
+                      value={newAliasInput}
+                      onChange={(e) => {
+                        setNewAliasInput(e.target.value.replace(/\s/g, ''));
+                        setAliasError('');
+                      }}
+                      placeholder="new_alias"
+                      className="w-full bg-black/60 border border-white/15 focus:border-[#00CFFF] rounded-xl pl-8 pr-4 py-2.5 text-white font-mono text-sm focus:outline-none focus:ring-1 focus:ring-[#00CFFF] transition-all"
+                      autoFocus
+                    />
+                  </div>
+                  {aliasError && (
+                    <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1">
+                      <span>⚠️</span> {aliasError}
+                    </p>
+                  )}
+                  <p className="text-white/35 text-[10px] mt-1.5">
+                    Changing your Alias ID will also immediately change your dedicated form link to: <span className="font-mono text-[#00CFFF]">/f/{(newAliasInput || 'alias').toLowerCase().replace(/^@/, '')}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-gradient-to-r from-[#7C3AED] to-[#00CFFF] hover:opacity-90 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-all shadow-lg shadow-[#00CFFF]/10"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs font-medium transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-3 mt-3">
+                {/* Current Alias display & copy */}
+                <div className="flex items-stretch gap-2">
+                  <div className="flex-1 flex items-center px-4 py-3 bg-black/50 border border-white/10 rounded-xl">
+                    <span className="text-[#00CFFF] font-mono font-bold text-base tracking-wider">@{userAlias || '—'}</span>
+                  </div>
+                  <button
+                    onClick={handleCopy}
+                    className={`flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-xs transition-all shrink-0 ${
+                      copied
+                        ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+                        : 'bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {copied ? (
+                      <><CheckCircle2 size={15} /> Copied Alias</>
+                    ) : (
+                      <><Copy size={15} /> Copy Alias</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Dedicated Referral Link */}
+                <div className="p-3.5 bg-black/30 border border-white/5 rounded-xl flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest font-semibold">Dedicated Referral Link</span>
+                    <a
+                      href={referralFormUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-[#00CFFF] hover:underline flex items-center gap-1 font-mono"
+                    >
+                      Open form <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="flex items-stretch gap-2">
+                    <div className="flex-1 flex items-center px-3 py-2 bg-black/50 border border-white/10 rounded-lg overflow-hidden">
+                      <span className="text-[#00CFFF] font-mono text-xs truncate">{referralFormUrl}</span>
+                    </div>
+                    <button
+                      onClick={handleCopyLink}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-xs transition-all shrink-0 ${
+                        copiedLink
+                          ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+                          : 'bg-[#00CFFF]/15 border border-[#00CFFF]/30 text-[#00CFFF] hover:bg-[#00CFFF]/25'
+                      }`}
+                    >
+                      {copiedLink ? (
+                        <><CheckCircle2 size={13} /> Copied</>
+                      ) : (
+                        <><Copy size={13} /> Copy Link</>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-white/35">
+                    Forms submitted through this link will credit referrals to your Alias ID (@{userAlias}).
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Crown badge if top 10 */}
@@ -163,12 +374,6 @@ export default function Profile() {
           {/* ── Actions ── */}
           <div className="flex flex-col gap-3">
             <button
-              onClick={handleUnlink}
-              className="w-full liquid-glass border border-white/10 text-white/60 text-sm font-medium py-3 rounded-xl hover:bg-white/5 hover:text-white transition-all"
-            >
-              Unlink Alias
-            </button>
-            <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium py-3 rounded-xl hover:bg-red-500/20 transition-all"
             >
@@ -179,6 +384,70 @@ export default function Profile() {
 
         </div>
       </main>
+
+      {/* ── Warning Alert Modal for Changing AWS Alias ID ── */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="liquid-glass border border-red-500/40 bg-[#0B0F1A]/95 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-left">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                <ShieldAlert size={26} />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base sm:text-lg leading-tight">
+                  Warning: Changing Your Alias ID
+                </h3>
+                <p className="text-red-400/90 text-xs font-semibold uppercase tracking-wider mt-0.5">
+                  Action requires your confirmation
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 mb-4 text-xs text-red-200/90 leading-relaxed flex flex-col gap-2">
+              <p>
+                <strong>⚠️ Warning:</strong> If you change your AWS Alias ID, <strong>your existing data will be changed</strong>, and <strong>you may lose your existing referrals</strong> associated with <span className="font-mono text-white underline">@{userAlias}</span>.
+              </p>
+              <p>
+                Your dedicated referral form link will also immediately change from:
+              </p>
+              <div className="bg-black/60 rounded-lg p-2 font-mono text-[11px] text-white/80 space-y-1">
+                <div className="text-red-400/80 line-through truncate">
+                  Old: {window.location.origin}/f/{userAlias.toLowerCase()}
+                </div>
+                <div className="text-[#00CFFF] font-bold truncate">
+                  New: {window.location.origin}/f/{normalizeAlias(newAliasInput).toLowerCase()}
+                </div>
+              </div>
+              <p className="text-[11px] text-white/60">
+                Any previous links you shared will no longer track submissions to your profile.
+              </p>
+            </div>
+
+            <p className="text-white/80 text-xs mb-5 font-medium">
+              Do you agree to these changes and wish to proceed with updating your Alias ID to <strong className="text-[#00CFFF] font-mono">@{normalizeAlias(newAliasInput)}</strong>?
+            </p>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => setShowWarningModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-semibold transition-all"
+              >
+                Cancel, Keep @{userAlias}
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleConfirmAliasChange}
+                className="flex-1 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
+              >
+                {isUpdating ? 'Updating...' : 'I Agree, Change Alias ID'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </div>
   );

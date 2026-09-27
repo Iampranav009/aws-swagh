@@ -1,4 +1,4 @@
-import { Activity, Download, LayoutDashboard, MailPlus, Network, Users } from 'lucide-react';
+import { Activity, ClipboardList, Database, Download, LayoutDashboard, MailPlus, Network, Users } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const items = [
@@ -6,7 +6,9 @@ const items = [
   { href: '/admin/invitations', label: 'Invitations', icon: MailPlus },
   { href: '/admin/activity', label: 'SBCL Activity', icon: Activity },
   { href: '/admin/signups', label: 'Signup Records', icon: Users },
+  { href: '/admin/forms', label: 'SBCL Form Data', icon: ClipboardList },
   { href: '/admin/network', label: 'Referral Network', icon: Network },
+  { href: '/admin/registry', label: 'ALICE ID Registry', icon: Database },
   { href: '/admin/exports', label: 'Exports', icon: Download },
 ];
 

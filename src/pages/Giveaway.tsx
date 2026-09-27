@@ -413,34 +413,6 @@ export default function Giveaway() {
         </header>
 
 
-        {/* ── GOODIES CLAIM NOTICE (Responsive & Mobile Optimized) ── */}
-        <section className="hidden md:flex w-full rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-orange-500/10 via-purple-600/10 to-transparent border border-white/10 shadow-xl flex-col md:flex-row items-stretch md:items-center justify-between gap-6 backdrop-blur-md">
-          <div className="flex flex-col gap-2 min-w-0">
-            <h3 className="text-base sm:text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-purple-400 flex items-center gap-2">
-              <Gift size={18} className="text-orange-400 animate-bounce" /> Goodies Claim &amp; Distribution Details
-            </h3>
-            <div className="text-xs text-white/70 space-y-2 leading-relaxed">
-              <p>
-                <strong>1. Leaderboard Top 5 Champions:</strong> Your custom AWS goodies will be shipped directly to your addresses within <strong>2 to 3 weeks</strong> (due to standard production manufacturing times).
-              </p>
-              <p>
-                <strong>2. Lucky Giveaway 150 Winners:</strong> Your goodies will also be ready in <strong>2 to 3 weeks</strong>, but they are <strong>exclusively available for pickup on the JDIET College Campus</strong>. If you are an outside participant, you will need to collect them from the campus.
-              </p>
-              <p className="text-white/40 italic">
-                * Details regarding pickup slots and reservations will be shared in our official group. Please join using the button.
-              </p>
-            </div>
-          </div>
-          <a
-            href="https://chat.whatsapp.com/GAfhZWodmWy7DObGfVfJ1q"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full md:w-auto px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-sm text-center transition-all shadow-[0_0_15px_rgba(22,163,74,0.4)] whitespace-nowrap shrink-0 flex items-center justify-center gap-2"
-          >
-            Join WhatsApp Group 💬
-          </a>
-        </section>
-
         {/* 2. Giant Live Selector Console */}
         <section className="w-full flex flex-col gap-6">
           <div className="w-full rounded-3xl p-6 sm:p-10 md:p-14 bg-[#0F1426]/75 border border-white/10 backdrop-blur-md relative overflow-hidden flex flex-col items-center justify-center text-center h-[300px] sm:h-[360px] shadow-[0_15px_40px_rgba(124,58,237,0.15)]">

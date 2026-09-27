@@ -45,8 +45,11 @@ export default function SwagSection() {
                   <div className="h-[1px] w-12 sm:w-20 bg-white/40"></div>
                 </div>
                 <h3 className="text-white text-2xl sm:text-3xl lg:text-5xl font-bold tracking-wider uppercase drop-shadow mt-1">
-                  23<sup className="text-xl sm:text-2xl font-bold">RD</sup> MAY, 2026
+                  30<sup className="text-xl sm:text-2xl font-bold">TH</sup> OCTOBER, 2026
                 </h3>
+                <p className="text-white/70 text-xs sm:text-sm font-medium tracking-wide mt-2">
+                  Results Announcement: <span className="text-[#00CFFF] font-semibold">3rd November, 2026</span>
+                </p>
               </div>
 
               <Link

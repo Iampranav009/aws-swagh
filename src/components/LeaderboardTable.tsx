@@ -24,7 +24,9 @@ export default function LeaderboardTable() {
     );
   }
 
-  const rows = leaderboard.slice(0, 20);
+  // A fresh program should look fresh: registered builders remain eligible to
+  // receive new referrals, but zero-point rows are not ranked publicly.
+  const rows = leaderboard.filter((user) => user.referrals > 0).slice(0, 20);
 
   return (
     <div className="w-full max-w-4xl mx-auto liquid-glass rounded-3xl overflow-hidden border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
@@ -42,7 +44,7 @@ export default function LeaderboardTable() {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={4} className="p-10 text-center text-white/50 text-sm">No data available</td></tr>
+              <tr><td colSpan={4} className="p-10 text-center text-white/50 text-sm">The new leaderboard is ready. New referrals will appear here.</td></tr>
             ) : (
               rows.map((user, idx) => {
                 const rank = idx + 1;
@@ -85,7 +87,7 @@ export default function LeaderboardTable() {
         </div>
 
         {rows.length === 0 ? (
-          <div className="p-8 text-center text-white/50 text-sm">No data available</div>
+          <div className="p-8 text-center text-white/50 text-sm">The new leaderboard is ready. New referrals will appear here.</div>
         ) : (
           rows.map((user, idx) => {
             const rank = idx + 1;

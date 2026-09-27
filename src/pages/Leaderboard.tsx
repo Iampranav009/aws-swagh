@@ -16,6 +16,9 @@ export default function Leaderboard() {
 
           <div className="flex-1 px-4 sm:px-6 w-full mb-8 relative z-10 pt-8 sm:pt-10 pb-28 md:pb-10">
             <div className="text-center mb-10 sm:mb-16">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[#00CFFF] text-xs font-semibold mb-4 tracking-wide shadow-sm">
+                <span>🗓️ Applications Close: 30th October 2026 · Results: 3rd November 2026</span>
+              </div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight drop-shadow-xl">
                 Top{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#00CFFF]">
@@ -23,7 +26,7 @@ export default function Leaderboard() {
                 </span>
               </h1>
               <p className="text-white/60 text-sm md:text-base max-w-lg mx-auto leading-relaxed">
-                Live rankings updated every 5 seconds. Refer peers and climb the board to win exclusive AWS gear!
+                A new referral program starts today. New referrals update every 3 seconds and build a fresh ranking.
               </p>
             </div>
             <LeaderboardTable />

@@ -7,6 +7,7 @@ import TierToast from '../components/TierToast';
 import { Link } from 'react-router-dom';
 import { getTierForReferrals, getNextTier } from '../lib/tiers';
 import { normalizeAlias } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -18,12 +19,74 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   const [copiedSignup, setCopiedSignup] = useState(false);
   const [copiedForm, setCopiedForm] = useState(false);
+  const [sbclSignupUrl, setSbclSignupUrl] = useState('https://bit.ly/4cvi5S6');
+  const [sbclName, setSbclName] = useState('');
+
+  useEffect(() => {
+    const cleanAlias = normalizeAlias(userAlias);
+    const storedSbcl = localStorage.getItem('sub_referrer_sbcl');
+
+    async function resolveSbcl() {
+      try {
+        let sbclCode = storedSbcl;
+        if (!sbclCode && (user?.id || cleanAlias)) {
+          const filter = user?.id
+            ? `created_by.eq.${user.id},code.eq.${cleanAlias}`
+            : `code.eq.${cleanAlias}`;
+          const { data: sub } = await supabase.from('sub_referrals').select('sbcl_code').or(filter).limit(1).maybeSingle();
+          if (sub?.sbcl_code) {
+            sbclCode = sub.sbcl_code;
+            localStorage.setItem('sub_referrer_sbcl', sub.sbcl_code);
+          }
+        }
+
+        if (sbclCode) {
+          const { data: profile } = await supabase
+            .from('sbcl_profiles')
+            .select('name,builder_signup_url')
+            .eq('sbcl_code', sbclCode)
+            .maybeSingle();
+
+          if (profile?.builder_signup_url) {
+            setSbclSignupUrl(profile.builder_signup_url);
+          }
+          if (profile?.name) {
+            setSbclName(profile.name);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load SBCL signup link:', err);
+      }
+    }
+
+    resolveSbcl();
+  }, [user, userAlias]);
+
+  // Sync real full name from Google/auth account to sub_referrals and submissions
+  useEffect(() => {
+    if (!user || !userAlias) return;
+    const cleanAlias = normalizeAlias(userAlias);
+    const realName = String(user.user_metadata?.full_name || user.user_metadata?.name || '').trim();
+    if (cleanAlias && realName && realName.toUpperCase() !== cleanAlias.toUpperCase()) {
+      supabase
+        .from('sub_referrals')
+        .update({ name: realName, created_by: user.id })
+        .ilike('code', cleanAlias)
+        .then(() => {
+          supabase
+            .from('sbcl_form_submissions')
+            .update({ referred_by_name: realName })
+            .ilike('referral_code', cleanAlias);
+        });
+    }
+  }, [user, userAlias]);
 
   useEffect(() => {
     if (user && leaderboard.length > 0 && !dataLoading) {
       const currentExists = leaderboard.some(u => u.alias.toUpperCase() === userAlias.toUpperCase());
       if (!currentExists) {
-        const foundByName = leaderboard.find(u => u.name.toLowerCase() === user.displayName?.toLowerCase());
+        const fullName = String(user.user_metadata?.full_name || '');
+        const foundByName = leaderboard.find(u => u.name.toLowerCase() === fullName.toLowerCase());
         if (foundByName) {
           localStorage.setItem('aws_alias', foundByName.alias);
           setUserAlias(foundByName.alias);
@@ -53,6 +116,19 @@ export default function Dashboard() {
     if (normalized) {
       localStorage.setItem('aws_alias', normalized);
       setUserAlias(normalized);
+      const realName = String(user?.user_metadata?.full_name || user?.user_metadata?.name || '').trim();
+      if (realName && realName.toUpperCase() !== normalized.toUpperCase()) {
+        supabase
+          .from('sub_referrals')
+          .update({ name: realName, created_by: user?.id })
+          .ilike('code', normalized)
+          .then(() => {
+            supabase
+              .from('sbcl_form_submissions')
+              .update({ referred_by_name: realName })
+              .ilike('referral_code', normalized);
+          });
+      }
     }
   };
 
@@ -114,26 +190,38 @@ export default function Dashboard() {
   const rank = leaderboard.findIndex(u => normalizeAlias(u.alias) === myAlias) + 1;
   const isTop10 = rank > 0 && rank <= 10;
 
-  // Build processed users, flagging duplicates
+  // Build processed users, flagging duplicates & pre-existing records
   const seenAliases = new Set<string>();
   const allProcessedUsers = allUsers.map(u => {
     const alias = normalizeAlias(u.alias);
-    const isDuplicate = seenAliases.has(alias);
-    seenAliases.add(alias);
-    return { ...u, alias, isDuplicate };
+    const isPreExisting = u.isValid === false && (
+      (u.flagReason || '').toLowerCase().includes('record') ||
+      (u.flagReason || '').toLowerCase().includes('existing') ||
+      (u.flagReason || '').toLowerCase().includes('sheet')
+    );
+    const isDuplicate = seenAliases.has(alias) || (u.isValid === false && !isPreExisting);
+    if (alias) seenAliases.add(alias);
+    const isFlagged = isPreExisting || isDuplicate || u.isValid === false;
+    const flagReason = u.flagReason || (isPreExisting ? 'Already in database record (student mega sheet)' : isDuplicate ? 'Already signed up / account already claimed' : '');
+    return { ...u, alias, isDuplicate, isPreExisting, isFlagged, flagReason };
   });
 
   // Users who entered MY alias as their referral code
   const referredUsers = allProcessedUsers.filter(u => normalizeAlias(u.referralCode) === myAlias);
+  const validReferredUsers = referredUsers.filter(u => !u.isFlagged);
+
+  const referralLink = typeof window !== 'undefined'
+    ? `${window.location.origin}/f/${myAlias.toLowerCase()}`
+    : `/f/${myAlias.toLowerCase()}`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(userAlias);
+    navigator.clipboard.writeText(referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const points    = currentUserData?.points    || 0;
-  const referrals  = currentUserData?.referrals  || 0;
+  const referrals  = currentUserData ? currentUserData.referrals : validReferredUsers.length;
+  const points    = currentUserData ? currentUserData.points : validReferredUsers.length * 15;
   const currentTier = getTierForReferrals(referrals);
   const nextTier    = getNextTier(currentTier);
   const progressPct = nextTier
@@ -157,9 +245,9 @@ export default function Dashboard() {
               <div>
                 <p className="text-white/40 text-[10px] uppercase tracking-widest mb-1 font-semibold">Welcome back</p>
                 <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00CFFF] to-[#7C3AED] leading-tight">
-                  {user?.displayName || currentUserData?.name || userAlias}
+                  {String(user?.user_metadata?.full_name || '') || currentUserData?.name || userAlias}
                 </h1>
-                <p className="text-white/40 text-xs sm:text-sm mt-1">Share your referral code to earn points and climb the board.</p>
+                <p className="text-white/40 text-xs sm:text-sm mt-1">Share your referral link to earn points and climb the board.</p>
               </div>
               {/* Right actions: Rewards + Profile */}
               <div className="flex items-center gap-2 shrink-0">
@@ -218,30 +306,45 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Referral Code + Tier row */}
+          {/* Referral Link + Tier row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-5">
-            {/* Referral code copy — split display + button */}
-            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-2">
-              <p className="text-white/40 text-[10px] uppercase tracking-widest font-semibold">Your Referral Code</p>
-              <div className="flex items-stretch gap-2">
-                <div className="flex-1 flex items-center px-4 py-3 bg-black/50 border border-white/10 rounded-xl overflow-hidden">
-                  <span className="text-[#00CFFF] font-mono font-bold tracking-widest text-sm truncate">@{userAlias}</span>
+            {/* Referral link copy — split display + button */}
+            <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col justify-between gap-2">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-white/40 text-[10px] uppercase tracking-widest font-semibold">Your Referral Link</p>
+                  <a
+                    href={referralLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-[#00CFFF] hover:underline flex items-center gap-1 font-mono"
+                  >
+                    Open form <ExternalLink size={10} />
+                  </a>
                 </div>
-                <button
-                  onClick={handleCopy}
-                  className={`flex items-center gap-1.5 px-4 py-3 rounded-xl font-semibold text-xs transition-all shrink-0 ${
-                    copied
-                      ? 'bg-green-500/20 border border-green-500/40 text-green-400'
-                      : 'bg-[#00CFFF]/15 border border-[#00CFFF]/30 text-[#00CFFF] hover:bg-[#00CFFF]/25'
-                  }`}
-                >
-                  {copied ? (
-                    <><CheckCircle2 size={14} /> Copied!</>
-                  ) : (
-                    <><Copy size={14} /> Copy</>
-                  )}
-                </button>
+                <div className="flex items-stretch gap-2">
+                  <div className="flex-1 flex items-center px-3.5 py-3 bg-black/50 border border-white/10 rounded-xl overflow-hidden">
+                    <span className="text-[#00CFFF] font-mono font-medium text-xs truncate">{referralLink}</span>
+                  </div>
+                  <button
+                    onClick={handleCopy}
+                    className={`flex items-center gap-1.5 px-4 py-3 rounded-xl font-semibold text-xs transition-all shrink-0 ${
+                      copied
+                        ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+                        : 'bg-[#00CFFF]/15 border border-[#00CFFF]/30 text-[#00CFFF] hover:bg-[#00CFFF]/25'
+                    }`}
+                  >
+                    {copied ? (
+                      <><CheckCircle2 size={14} /> Copied!</>
+                    ) : (
+                      <><Copy size={14} /> Copy link</>
+                    )}
+                  </button>
+                </div>
               </div>
+              <p className="text-[10px] text-white/35">
+                Share this dedicated form link. Submissions attribute referrals directly to you (@{myAlias}).
+              </p>
             </div>
             {/* Tier — new badge-based card */}
             <div className="liquid-glass p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-2">
@@ -300,15 +403,18 @@ export default function Dashboard() {
                 </h3>
                 
                 <div className="space-y-3">
-                  {/* Signup Link */}
+                  {/* 1. SBCL Builder Signup Link */}
                   <div className="p-3 bg-white/5 border border-white/10 rounded-xl group hover:border-[#7C3AED]/30 transition-all">
-                    <p className="text-white/40 text-[9px] uppercase tracking-wider font-bold mb-2">1. Signup Link</p>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-white/40 text-[9px] uppercase tracking-wider font-bold">1. Builder Signup Link</p>
+                      {sbclName && <span className="text-[9px] text-[#A78BFA] font-medium truncate max-w-[140px]">{sbclName}</span>}
+                    </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-white/60 font-mono truncate">bit.ly/4cvi5S6</span>
-                      <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-white/60 font-mono truncate">{sbclSignupUrl.replace(/^https?:\/\//, '')}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button 
                           onClick={() => {
-                            navigator.clipboard.writeText('https://bit.ly/4cvi5S6');
+                            navigator.clipboard.writeText(sbclSignupUrl);
                             setCopiedSignup(true);
                             setTimeout(() => setCopiedSignup(false), 2000);
                           }}
@@ -318,10 +424,11 @@ export default function Dashboard() {
                           {copiedSignup ? <CheckCircle2 size={12} /> : <Copy size={12} />}
                         </button>
                         <a 
-                          href="https://bit.ly/4cvi5S6" 
+                          href={sbclSignupUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="p-1.5 hover:bg-[#7C3AED]/20 rounded-md text-[#7C3AED] transition-all"
+                          title="Open signup page"
                         >
                           <ExternalLink size={12} />
                         </a>
@@ -329,15 +436,16 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Google Form Link */}
+                  {/* 2. Personal /f/@alias Form Link */}
                   <div className="p-3 bg-white/5 border border-white/10 rounded-xl group hover:border-[#00CFFF]/30 transition-all">
-                    <p className="text-white/40 text-[9px] uppercase tracking-wider font-bold mb-2">2. Submission Form</p>
+                    <p className="text-white/40 text-[9px] uppercase tracking-wider font-bold mb-1.5">2. Your Dedicated Form Link</p>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-white/60 font-mono truncate">forms.gle/PGhwQv...</span>
-                      <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-[#00CFFF] font-mono truncate">{`/f/${myAlias.toLowerCase()}`}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button 
                           onClick={() => {
-                            navigator.clipboard.writeText('https://forms.gle/PGhwQvEUXNwWFJ7L7');
+                            const formUrl = `${window.location.origin}/f/${myAlias.toLowerCase()}`;
+                            navigator.clipboard.writeText(formUrl);
                             setCopiedForm(true);
                             setTimeout(() => setCopiedForm(false), 2000);
                           }}
@@ -347,15 +455,19 @@ export default function Dashboard() {
                           {copiedForm ? <CheckCircle2 size={12} /> : <Copy size={12} />}
                         </button>
                         <a 
-                          href="https://forms.gle/PGhwQvEUXNwWFJ7L7" 
+                          href={`${window.location.origin}/f/${myAlias.toLowerCase()}`}
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="p-1.5 hover:bg-[#00CFFF]/20 rounded-md text-[#00CFFF] transition-all"
+                          title="Open your personal form"
                         >
                           <ExternalLink size={12} />
                         </a>
                       </div>
                     </div>
+                    <p className="text-[9px] text-white/35 mt-1.5">
+                      Submissions through this form link attribute the referral to you (@{myAlias}) automatically.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -371,18 +483,73 @@ export default function Dashboard() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { text: "Open the signup link: bit.ly/4cvi5S6", icon: "1" },
-                    { text: "Sign in / create your account", icon: "2" },
-                    { text: "Click on your profile icon (top right)", icon: "3" },
-                    { text: "Tap on 'QR Code' in the menu", icon: "4" },
-                    { text: "Copy your alias (e.g. @username)", icon: "5" },
-                    { text: "Submit it here: forms.gle/PGhwQv...", icon: "6" },
+                    {
+                      label: "Open the signup link:",
+                      linkText: sbclSignupUrl.replace(/^https?:\/\//, ''),
+                      href: sbclSignupUrl,
+                      icon: "1",
+                    },
+                    {
+                      label: "Sign in / create your account",
+                      icon: "2",
+                    },
+                    {
+                      label: "Click on your profile icon (top right)",
+                      icon: "3",
+                    },
+                    {
+                      label: "Tap on 'QR Code' in the menu",
+                      icon: "4",
+                    },
+                    {
+                      label: "Copy your alias (e.g. @username)",
+                      icon: "5",
+                    },
+                    {
+                      label: "Submit it here:",
+                      linkText: `/f/${myAlias.toLowerCase()}`,
+                      href: `${window.location.origin}/f/${myAlias.toLowerCase()}`,
+                      icon: "6",
+                      highlight: true,
+                    },
                   ].map((step, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 bg-black/20 rounded-xl border border-white/5">
-                      <span className="w-5 h-5 shrink-0 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-white/40 border border-white/10">
+                    <div
+                      key={i}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                        step.highlight
+                          ? 'border-[#00CFFF]/30 bg-[#00CFFF]/5'
+                          : 'border-white/5 bg-black/20'
+                      }`}
+                    >
+                      <span
+                        className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold border ${
+                          step.highlight
+                            ? 'bg-[#00CFFF]/20 text-[#00CFFF] border-[#00CFFF]/30'
+                            : 'bg-white/5 text-white/40 border-white/10'
+                        }`}
+                      >
                         {step.icon}
                       </span>
-                      <p className="text-[11px] text-white/70 leading-snug">{step.text}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-white/70 leading-snug">
+                          {step.href ? (
+                            <a
+                              href={step.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-white/80 hover:text-[#00CFFF] transition-colors inline-flex items-center gap-1.5 flex-wrap font-medium"
+                            >
+                              <span>{step.label}</span>
+                              <span className="font-mono text-[#00CFFF] font-semibold underline decoration-[#00CFFF]/40 hover:decoration-[#00CFFF]">
+                                {step.linkText}
+                              </span>
+                              <ExternalLink size={11} className="text-[#00CFFF]/70 shrink-0" />
+                            </a>
+                          ) : (
+                            step.label
+                          )}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -397,26 +564,34 @@ export default function Dashboard() {
                 <Users size={16} className="text-[#00CFFF]" />
                 Referral Network
               </h2>
-              <span className="px-2.5 py-1 bg-[#7C3AED]/20 border border-[#7C3AED]/30 rounded-full text-[#7C3AED] text-[10px] font-semibold tracking-wider uppercase">
-                {referredUsers.length} Users
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-emerald-400 text-[10px] font-semibold tracking-wider uppercase">
+                  {validReferredUsers.length} Valid
+                </span>
+                {referredUsers.length - validReferredUsers.length > 0 && (
+                  <span className="px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-[10px] font-semibold tracking-wider uppercase">
+                    {referredUsers.length - validReferredUsers.length} Flagged
+                  </span>
+                )}
+              </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[380px]">
+              <table className="w-full text-left min-w-[420px]">
                 <thead className="bg-black/40 text-white/40 text-[10px] uppercase tracking-wider">
                   <tr>
                     <th className="p-4 pl-5 sm:pl-6 font-semibold w-10">#</th>
                     <th className="p-4 font-semibold">Name</th>
                     <th className="p-4 font-semibold">Alias</th>
+                    <th className="p-4 font-semibold">Status</th>
                     <th className="p-4 font-semibold text-right pr-5 sm:pr-6">Points</th>
                   </tr>
                 </thead>
                 <tbody>
                   {dataLoading ? (
-                    <tr><td colSpan={4} className="p-8 text-center text-white/50 text-sm">Loading referrals...</td></tr>
+                    <tr><td colSpan={5} className="p-8 text-center text-white/50 text-sm">Loading referrals...</td></tr>
                   ) : referredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-10 text-center bg-black/10">
+                      <td colSpan={5} className="p-10 text-center bg-black/10">
                         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3 border border-white/5">
                           <BookOpen className="text-white/20" size={20} />
                         </div>
@@ -428,19 +603,47 @@ export default function Dashboard() {
                     referredUsers.map((u, idx) => (
                       <tr key={idx} className="border-b border-white/5 text-white hover:bg-white/5 transition-colors group">
                         <td className="p-4 pl-5 sm:pl-6 font-mono text-white/30 text-xs">{idx + 1}</td>
-                        <td className="p-4 font-medium text-sm">{u.name || '—'}</td>
+                        <td className="p-4">
+                          <p className="font-medium text-sm text-white">{u.name || '—'}</p>
+                          {u.isFlagged && u.flagReason && (
+                            <p className="text-[11px] text-amber-400/80 mt-0.5 font-sans leading-tight">
+                              ⚠ {u.flagReason}
+                            </p>
+                          )}
+                        </td>
                         <td className="p-4">
                           <span className="text-[11px] font-mono px-2 py-0.5 bg-white/5 rounded-md text-white/60 border border-white/10">
                             @{u.alias}
                           </span>
                         </td>
-                        <td className="p-4 text-right pr-5 sm:pr-6">
-                          {u.isDuplicate ? (
-                            <span className="text-[9px] font-bold uppercase text-red-400 bg-red-400/10 px-2 py-1 rounded border border-red-400/20">
+                        <td className="p-4">
+                          {u.isPreExisting ? (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-lg"
+                              title="Already in club database from student mega sheet"
+                            >
+                              In DB Record
+                            </span>
+                          ) : u.isDuplicate ? (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/25 px-2 py-0.5 rounded-lg"
+                              title="Already claimed by an earlier submission"
+                            >
                               Duplicate
                             </span>
                           ) : (
-                            <span className="text-[#00CFFF] font-bold bg-[#00CFFF]/10 px-2.5 py-1 rounded-full text-sm">+15</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-lg">
+                              ✓ Valid
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right pr-5 sm:pr-6">
+                          {u.isFlagged ? (
+                            <span className="text-white/30 font-mono text-xs">0 pts</span>
+                          ) : (
+                            <span className="text-[#00CFFF] font-bold bg-[#00CFFF]/10 px-2.5 py-1 rounded-full text-xs sm:text-sm">
+                              +15 pts
+                            </span>
                           )}
                         </td>
                       </tr>

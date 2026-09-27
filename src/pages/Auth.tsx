@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { auth, googleProvider } from '../lib/firebase';
-import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthUI } from '../components/ui/auth-fuse';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export default function Auth() {
   const location = useLocation();
@@ -11,24 +10,20 @@ export default function Auth() {
   const { user, loading: authLoading } = useAuth();
   const returnTo = new URLSearchParams(location.search).get('returnTo');
 
-  const [isSignup, setIsSignup] = useState(new URLSearchParams(location.search).get('signup') === 'true');
+  const isSignup = false;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [alias, setAlias] = useState('');
-  const [referral, setReferral] = useState('');
   const [showAliasModal, setShowAliasModal] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setIsSignup(new URLSearchParams(location.search).get('signup') === 'true');
-  }, [location.search]);
-
-  useEffect(() => {
     if (!authLoading && user) {
-      if (returnTo?.startsWith('/')) {
-        navigate(returnTo, { replace: true });
+      const savedReturnTo = localStorage.getItem('auth_return_to');
+      localStorage.removeItem('auth_return_to');
+      if (returnTo?.startsWith('/') || savedReturnTo?.startsWith('/')) {
+        navigate(returnTo?.startsWith('/') ? returnTo : savedReturnTo!, { replace: true });
         return;
       }
       if (localStorage.getItem('aws_alias')) {
@@ -45,43 +40,8 @@ export default function Auth() {
     setLoading(true);
     
     try {
-      // Persist the Firebase session across browser restarts on this device.
-      await setPersistence(auth, browserLocalPersistence);
-      if (isSignup) {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, { displayName: name });
-        if (referral) {
-          localStorage.setItem('aws_referral', referral);
-        }
-        setShowAliasModal(true);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        if (returnTo?.startsWith('/')) {
-          navigate(returnTo);
-          return;
-        }
-        if (!localStorage.getItem('aws_alias')) {
-          setShowAliasModal(true);
-        } else {
-          navigate('/dashboard');
-        }
-      }
-    } catch (err: any) {
-      const code = String(err?.code || '');
-      setError(
-        code === 'auth/invalid-credential'
-          ? 'Email/password login is not configured for this account, or the password is incorrect. If you created this account with Google, use “Continue with Google”.'
-          : err.message || 'Authentication failed'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogle = async () => {
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(auth, googleProvider);
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
       if (returnTo?.startsWith('/')) {
         navigate(returnTo);
         return;
@@ -92,26 +52,45 @@ export default function Auth() {
         navigate('/dashboard');
       }
     } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      if (returnTo?.startsWith('/')) localStorage.setItem('auth_return_to', returnTo);
+      const { error: authError } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth` } });
+      if (authError) throw authError;
+    } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const resetPassword = async () => {
+    if (!email.trim()) return setError('Enter your email first, then request a password reset.');
+    setLoading(true); setError('');
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/auth/reset-password` });
+    setLoading(false);
+    setError(resetError ? resetError.message : 'Password reset email requested. Check your inbox and spam folder.');
   };
 
   return (
     <>
       <AuthUI 
         isSignIn={!isSignup}
-        onToggleForm={() => { setIsSignup(!isSignup); setError(''); }}
+        allowSignUp={false}
         onSignIn={handleAuth}
         onSignUp={handleAuth}
         onGoogle={handleGoogle}
         emailProps={{ value: email, onChange: e => setEmail(e.target.value) }}
         passwordProps={{ value: password, onChange: e => setPassword(e.target.value) }}
-        nameProps={{ value: name, onChange: e => setName(e.target.value) }}
-        referralProps={{ value: referral, onChange: e => setReferral(e.target.value) }}
         loading={loading}
         error={error}
         onBack={() => navigate('/')}
       />
+      <button type="button" onClick={resetPassword} disabled={loading} className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs text-white/60 hover:text-white">Forgot or migrated password?</button>
 
       {showAliasModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { fetchUsers, processLeaderboard, type LeaderboardEntry, type SheetUser } from '../lib/sheets';
+import { fetchArchivedLeaderboardUsers, fetchPrivateUsersFromSupabase, fetchUsers, processLeaderboard, type LeaderboardEntry, type SheetUser } from '../lib/sheets';
 
 const fetcher = async () => {
   const users = await fetchUsers();
@@ -9,9 +9,9 @@ const fetcher = async () => {
 
 export function useLeaderboard() {
   const { data, error, isLoading, mutate } = useSWR('leaderboard-data', fetcher, {
-    refreshInterval: 5000,       // poll every 5 seconds for near-instant leaderboard updates
+    refreshInterval: 3000,
     revalidateOnFocus: true,     // also refresh when user refocuses the tab
-    dedupingInterval: 4000,      // debounce duplicate requests within 4s
+    dedupingInterval: 1000,
   });
 
   return {
@@ -20,5 +20,33 @@ export function useLeaderboard() {
     loading:     isLoading,
     error,
     refresh:     mutate,
+  };
+}
+
+export function useArchivedLeaderboard() {
+  const { data, error, isLoading } = useSWR('archived-leaderboard-data', async () => {
+    const users = await fetchArchivedLeaderboardUsers();
+    return processLeaderboard(users);
+  });
+
+  return {
+    leaderboard: data || [] as LeaderboardEntry[],
+    loading: isLoading,
+    error,
+  };
+}
+
+export function usePrivateSignupRows() {
+  const { data, error, isLoading, mutate } = useSWR('private-signup-data', fetchPrivateUsersFromSupabase, {
+    refreshInterval: 3000,
+    revalidateOnFocus: true,
+    dedupingInterval: 2000,
+  });
+
+  return {
+    allUsers: data || [] as SheetUser[],
+    loading: isLoading,
+    error,
+    refresh: mutate,
   };
 }

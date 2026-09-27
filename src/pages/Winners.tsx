@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useArchivedLeaderboard } from '../hooks/useLeaderboard';
 import { Trophy, Award, Crown, Gift, Search, Medal, ArrowLeft, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
@@ -14,7 +14,7 @@ interface StudentWinner {
 }
 
 export default function Winners() {
-  const { leaderboard, loading } = useLeaderboard();
+  const { leaderboard, loading } = useArchivedLeaderboard();
   
   const [giveawayWinners, setGiveawayWinners] = useState<StudentWinner[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,51 +131,26 @@ export default function Winners() {
 
         {/* Header */}
         <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-[#A78BFA] text-xs font-semibold mb-4 tracking-wide shadow-sm">
+            <span>⭐ Archived Results · Previous Main Referral Program</span>
+          </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight">
-            🏆 Campaign{' '}
+            🏆 Last-Time{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00CFFF] via-[#7C3AED] to-orange-400">
               Winners Hall
             </span>
           </h1>
           <p className="text-white/50 text-xs sm:text-sm max-w-xl mx-auto mt-2 leading-relaxed">
-            Celebrating our absolute top referral leaders and the lucky winners drawn from our AWS Builder community giveaway.
+            Celebrating our last-time referral champions from the main referral program and the 150 lucky giveaway winners.
           </p>
         </div>
-
-        {/* ── GOODIES CLAIM NOTICE (Responsive & Mobile Optimized) ── */}
-        <section className="hidden md:flex w-full rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-orange-500/10 via-purple-600/10 to-transparent border border-white/10 shadow-xl flex-col md:flex-row items-stretch md:items-center justify-between gap-6 backdrop-blur-md mb-12">
-          <div className="flex flex-col gap-2 min-w-0">
-            <h3 className="text-base sm:text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-purple-400 flex items-center gap-2">
-              <Gift size={18} className="text-orange-400 animate-bounce" /> Goodies Claim &amp; Distribution Details
-            </h3>
-            <div className="text-xs text-white/70 space-y-2 leading-relaxed">
-              <p>
-                <strong>1. Leaderboard Top 5 Champions:</strong> Your custom AWS goodies will be shipped directly to your addresses within <strong>2 to 3 weeks</strong> (due to standard production manufacturing times).
-              </p>
-              <p>
-                <strong>2. Lucky Giveaway 150 Winners:</strong> Your goodies will also be ready in <strong>2 to 3 weeks</strong>, but they are <strong>exclusively available for pickup on the JDIET College Campus</strong>. If you are an outside participant, you will need to collect them from the campus.
-              </p>
-              <p className="text-white/40 italic">
-                * Details regarding pickup slots and reservations will be shared in our official group. Please join using the button.
-              </p>
-            </div>
-          </div>
-          <a
-            href="https://chat.whatsapp.com/GAfhZWodmWy7DObGfVfJ1q"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full md:w-auto px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-sm text-center transition-all shadow-[0_0_15px_rgba(22,163,74,0.4)] whitespace-nowrap shrink-0 flex items-center justify-center gap-2"
-          >
-            Join WhatsApp Group 💬
-          </a>
-        </section>
 
         {/* ── SECTION 1: TOP 5 MAIN WINNERS (Referral Champions) ── */}
         <section className="mb-14">
           <div className="flex items-center justify-center gap-2 mb-8">
             <Crown className="text-yellow-400 animate-pulse" size={24} />
             <h2 className="text-lg sm:text-xl font-bold text-white uppercase tracking-wider">
-              Referral Leaderboard Champions
+              Last-Time Winners — Main Referral Program Champions
             </h2>
           </div>
 
@@ -470,12 +445,12 @@ export default function Winners() {
             
             {/* Title & Info */}
             <div className="space-y-0.5 pt-1">
-              <h3 className="text-lg font-black text-white uppercase tracking-tight">Claim Your Swag! 🎁</h3>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">Winner Showcase 🏆</h3>
               <p className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00CFFF] to-[#7C3AED]">
                 {selectedWinner.name} (@{selectedWinner.alias})
               </p>
               <div className="inline-block px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white/60">
-                {selectedWinner.type === 'top5' && `Leaderboard Champion #${selectedWinner.rank}`}
+                {selectedWinner.type === 'top5' && `Last-Time Leaderboard Champion #${selectedWinner.rank}`}
                 {selectedWinner.type === 'elite' && `Elite Builder Achiever #${selectedWinner.rank}`}
                 {selectedWinner.type === 'giveaway' && `Lucky Giveaway Winner (Round ${selectedWinner.round})`}
               </div>
@@ -495,40 +470,7 @@ export default function Winners() {
               🎉 Congratulations on winning this goodies!
             </div>
 
-            {/* Instructions — compact */}
-            <div className="text-xs text-white/70 text-left bg-black/40 border border-white/5 p-3 rounded-xl w-full leading-relaxed">
-              <p className="font-semibold text-white text-[11px] flex items-center gap-1.5 border-b border-[#ffffff10] pb-1.5 mb-1.5">
-                📋 Claim Details:
-              </p>
-              {isTop5 ? (
-                <p className="text-[11px] text-[#00CFFF] font-medium leading-relaxed">
-                  💡 Swag details will be emailed within 2–3 weeks. Keep an eye on your inbox.
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-[11px] leading-relaxed">🚀 Ready in <strong>2–3 weeks</strong> — pickup at <strong>JDIET Campus</strong> (outside participants visit campus).</p>
-                  <p className="text-[11px] text-orange-400 font-medium">⚠️ Join the WhatsApp group below for pickup updates &amp; coordination.</p>
-                </div>
-              )}
-            </div>
 
-            {/* ── Mandatory WhatsApp Connection (Not for Top 5) ── */}
-            {!isTop5 && (
-              <div className="w-full mb-4">
-                <a
-                  href="https://chat.whatsapp.com/GAfhZWodmWy7DObGfVfJ1q"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#4F46E5] hover:opacity-95 text-white font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(124,58,237,0.4)] flex items-center justify-center gap-2 group cursor-pointer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 group-hover:scale-110 transition-transform">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.855L.057 23.885a.5.5 0 0 0 .612.612l6.03-1.475A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.794 9.794 0 0 1-5.012-1.378l-.36-.214-3.732.912.933-3.62-.236-.372A9.761 9.761 0 0 1 2.182 12C2.182 6.574 6.574 2.182 12 2.182c5.426 0 9.818 4.392 9.818 9.818 0 5.426-4.392 9.818-9.818 9.818z"/>
-                  </svg>
-                  Connect on WhatsApp (Mandatory)
-                </a>
-              </div>
-            )}
 
             {/* ── Get in Touch with Us ── */}
             <div className="w-full">

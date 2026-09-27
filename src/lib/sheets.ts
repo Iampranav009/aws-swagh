@@ -1,6 +1,10 @@
 import { normalizeAlias, levenshtein } from './utils';
+import { isSupabaseConfigured, supabase } from './supabase';
+import archivedLeaderboardJson from '../data/archived_leaderboard.json';
 
 export interface SheetUser {
+  id?: string | number;
+  sheetRow?: number;
   name: string;
   alias: string;
   rawAlias: string;
@@ -9,6 +13,12 @@ export interface SheetUser {
   referralCode: string;
   nameOnAws?: string;
   builderCentralId?: string;
+  submittedAt?: string;
+  referrerName?: string;
+  source?: 'google-sheet' | 'native-form';
+  sbclCode?: string;
+  isValid?: boolean;
+  flagReason?: string;
 }
 
 export interface LeaderboardEntry extends SheetUser {
@@ -20,6 +30,7 @@ export interface LeaderboardEntry extends SheetUser {
 const API_KEY  = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY;
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEETS_ID || "1Di4lk_UcuF_3HBUj_p35N26h9fPJ4e0-lF9y2OI_WdM";
 const SHEET_NAME = "Form Responses 1";
+export const REFERRAL_PROGRAM_CUTOFF_SHEET_ROW = 1318;
 
 // ── Re-export the single source of truth for alias normalisation ────────────
 export { normalizeAlias };
@@ -72,7 +83,7 @@ function fuzzyResolveAlias(
   return bestAlias;
 }
 
-export async function fetchUsers(): Promise<SheetUser[]> {
+export async function fetchPrivateUsersFromSheet(): Promise<SheetUser[]> {
   try {
     if (!API_KEY) {
       console.warn("Missing Google Sheets API Key (VITE_GOOGLE_SHEETS_API_KEY)");
@@ -117,7 +128,7 @@ export async function fetchUsers(): Promise<SheetUser[]> {
       const builderCentralId = (row[builderIdColumn] || '').trim();
 
       if (alias) {
-        users.push({ name, alias, rawAlias, email, contact, referralCode, nameOnAws, builderCentralId });
+        users.push({ sheetRow: i + 1, name, alias, rawAlias, email, contact, referralCode, nameOnAws, builderCentralId });
       }
     }
 
@@ -128,6 +139,169 @@ export async function fetchUsers(): Promise<SheetUser[]> {
     console.error("[Sheets] fetchUsers error:", error);
     return [];
   }
+}
+
+export async function fetchPrivateUsersFromSupabase(): Promise<SheetUser[]> {
+  if (!isSupabaseConfigured) throw new Error('Supabase environment variables are missing');
+
+  const PAGE_SIZE = 1000;
+
+  // Paginate signups
+  const legacyData: any[] = [];
+  let fromLegacy = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('signups')
+      .select('name,email,alias,raw_alias,contact,referral_code,name_on_aws,builder_central_id,submitted_at')
+      .order('sheet_row', { ascending: true })
+      .range(fromLegacy, fromLegacy + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    legacyData.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    fromLegacy += PAGE_SIZE;
+  }
+
+  // Paginate sbcl_form_submissions
+  const nativeData: any[] = [];
+  let fromNative = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('sbcl_form_submissions')
+      .select('id,sbcl_code,name,email,alias,contact,referral_code,referred_by_name,name_on_aws,builder_central_id,created_at,is_valid,flag_reason')
+      .order('created_at', { ascending: true })
+      .range(fromNative, fromNative + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    nativeData.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    fromNative += PAGE_SIZE;
+  }
+
+  const legacyRows = legacyData.map((row) => {
+    const rawRef = clean(row.referral_code || '');
+    const parsed = rawRef.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+    return {
+      sheetRow: row.sheet_row,
+      name: row.name || '', email: row.email || '', alias: clean(row.alias), rawAlias: row.raw_alias || row.alias,
+      contact: row.contact || '', referralCode: rawRef, nameOnAws: row.name_on_aws || '', builderCentralId: row.builder_central_id || '', submittedAt: row.submitted_at || '', source: 'google-sheet' as const,
+      sbclCode: parsed,
+      isValid: true,
+      flagReason: '',
+    };
+  });
+  const nativeRows = nativeData.map((row) => {
+    const rawRef = clean(row.referral_code || '');
+    const explicitSbcl = row.sbcl_code ? String(row.sbcl_code).toUpperCase().trim() : '';
+    const fallbackSbcl = rawRef.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+    return {
+      id: row.id,
+      name: row.name || '', email: row.email || '', alias: clean(row.alias), rawAlias: row.alias || '',
+      contact: row.contact || '', referralCode: rawRef, referrerName: row.referred_by_name || '', nameOnAws: row.name_on_aws || '', builderCentralId: row.builder_central_id || '', submittedAt: row.created_at || '', source: 'native-form' as const,
+      sbclCode: explicitSbcl || fallbackSbcl,
+      isValid: row.is_valid !== false,
+      flagReason: row.flag_reason || '',
+    };
+  });
+  return [...legacyRows, ...nativeRows];
+}
+
+/**
+ * Public application data comes from Supabase Postgres.
+ * During the one-time infrastructure rollout, the sanitized Sheet response is
+ * retained as a read-only availability fallback. Private fields are removed.
+ */
+export async function fetchUsers(): Promise<SheetUser[]> {
+  try {
+    if (!isSupabaseConfigured) throw new Error('Supabase environment variables are missing');
+
+    const PAGE_SIZE = 1000;
+    const allRows: SheetUser[] = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('leaderboard_signups')
+        .select('name,alias,raw_alias,referral_code,name_on_aws,builder_central_id,referrer_name,sbcl_code,is_valid,flag_reason')
+        .order('sheet_row', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allRows.push(...data.map((row) => ({
+        name: row.name || '',
+        alias: clean(row.alias),
+        rawAlias: row.raw_alias || row.alias,
+        referralCode: clean(row.referral_code || ''),
+        nameOnAws: row.name_on_aws || '',
+        builderCentralId: row.builder_central_id || '',
+        referrerName: row.referrer_name || '',
+        sbclCode: row.sbcl_code || '',
+        isValid: row.is_valid !== false,
+        flagReason: row.flag_reason || '',
+      })));
+
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+
+    return allRows;
+  } catch (error) {
+    console.warn('[Supabase] Postgres unavailable; using sanitized Sheet fallback.', error);
+    const rows = await fetchPrivateUsersFromSheet();
+    return rows.map(({ email: _email, contact: _contact, ...publicRow }) => ({
+      ...publicRow,
+      referralCode: (publicRow.sheetRow || 0) > REFERRAL_PROGRAM_CUTOFF_SHEET_ROW
+        ? publicRow.referralCode
+        : '',
+    }));
+  }
+}
+
+export async function fetchArchivedLeaderboardUsers(): Promise<SheetUser[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const PAGE_SIZE = 1000;
+      const allData: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('archived_leaderboard_signups')
+          .select('name,alias,raw_alias,referral_code,name_on_aws,builder_central_id')
+          .order('id', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+
+      if (allData.length > 0) {
+        return allData.map((row) => ({
+          name: row.name || '',
+          alias: clean(row.alias),
+          rawAlias: row.raw_alias || row.alias,
+          referralCode: clean(row.referral_code || ''),
+          nameOnAws: row.name_on_aws || '',
+          builderCentralId: row.builder_central_id || '',
+        }));
+      }
+    } catch (err) {
+      console.warn('[Supabase] Error fetching archived signups; using static fallback.', err);
+    }
+  }
+
+  return (archivedLeaderboardJson as any[]).map((row) => ({
+    name: row.name || '',
+    alias: clean(row.alias),
+    rawAlias: row.rawAlias || row.alias,
+    referralCode: clean(row.referralCode || ''),
+    nameOnAws: row.nameOnAws || '',
+    builderCentralId: row.builderCentralId || '',
+  }));
 }
 
 export function processLeaderboard(users: SheetUser[]): LeaderboardEntry[] {
@@ -152,17 +326,28 @@ export function processLeaderboard(users: SheetUser[]): LeaderboardEntry[] {
 
   // ── Step 2: Credit referrers ──
   // Walk every UNIQUE user (from the map) and credit whoever they referred under.
-  // If the referral code doesn't exactly match a known alias, try fuzzy resolution.
+  // If the referral code doesn't exactly match a known alias, try prefix matching, fuzzy resolution,
+  // or dynamically create the referrer entry so sub-referrals and SBCLs appear immediately!
   for (const entry of Object.values(map)) {
     let refCode = entry.referralCode;
     if (!refCode) continue;
     if (refCode === entry.alias) continue; // self-referral — skip
+    if (entry.isValid === false) continue; // flagged as existing record or duplicate — skip referral credit
 
-    // Exact match first
+    // 1. Exact match first
     let referrer = map[refCode];
     let resolvedReferrerAlias = referrer ? refCode : null;
 
-    // Fuzzy fallback (minor typos)
+    // 2. Sub-code / alias without 3-letter prefix (e.g. AWSAWS001 -> AWS001)
+    if (!referrer && refCode.length > 3) {
+      const subPart = refCode.slice(3);
+      if (map[subPart] && subPart !== entry.alias) {
+        referrer = map[subPart];
+        resolvedReferrerAlias = subPart;
+      }
+    }
+
+    // 3. Fuzzy fallback (minor typos)
     if (!referrer) {
       const fuzzy = fuzzyResolveAlias(refCode, knownAliases);
       if (fuzzy && fuzzy !== entry.alias) {
@@ -171,11 +356,28 @@ export function processLeaderboard(users: SheetUser[]): LeaderboardEntry[] {
       }
     }
 
-    if (referrer) {
-      referrer.referrals += 1;
-      referrer.points    += 15;
-      entry.resolvedReferrerAlias = resolvedReferrerAlias;
+    // 4. If the referrer (sub-referral or SBCL) hasn't submitted a participant signup,
+    // dynamically register them so they appear on the leaderboard immediately!
+    if (!referrer) {
+      const displayName = (entry.referrerName || refCode).trim();
+      referrer = {
+        name: displayName,
+        alias: refCode,
+        rawAlias: refCode,
+        referralCode: '',
+        points: 0,
+        referrals: 0,
+      };
+      map[refCode] = referrer;
+      resolvedReferrerAlias = refCode;
+    } else if (clean(referrer.name) === clean(referrer.alias) && entry.referrerName && clean(entry.referrerName) !== clean(referrer.alias)) {
+      // If referrer was previously recorded with their alias as the name, upgrade to the real name
+      referrer.name = entry.referrerName.trim();
     }
+
+    referrer.referrals += 1;
+    referrer.points    += 15;
+    entry.resolvedReferrerAlias = resolvedReferrerAlias;
   }
 
   // ── Step 2.5: Special Manual Approval for YATHARTH29 ──────────────────────

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Trophy, UserCircle2, BookOpen, Bell, Medal, Award } from 'lucide-react';
+import { LayoutDashboard, Trophy, UserCircle2, BookOpen, Bell, Medal, Award, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useAuth } from '../context/AuthContext';
@@ -40,10 +40,10 @@ function useUnseenCount(userAlias: string) {
   return count;
 }
 
-export default function Sidebar({ userAlias = '', setUserAlias }: { userAlias?: string; setUserAlias?: (v: string) => void }) {
+export default function Sidebar({ userAlias = '' }: { userAlias?: string; setUserAlias?: (v: string) => void }) {
   const location = useLocation();
   const unseenCount = useUnseenCount(userAlias);
-  const { user } = useAuth(); // Import useAuth hook
+  const { user, logout } = useAuth(); // Import useAuth hook
 
   const allLinks = [
     { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',   protected: true },
@@ -96,20 +96,38 @@ export default function Sidebar({ userAlias = '', setUserAlias }: { userAlias?: 
         </a>
       </div>
 
-      {/* Alias badge at bottom */}
-      {userAlias && setUserAlias && (
-        <div className="p-5 border-t border-white/5">
+      {/* Account & Logout at bottom */}
+      {(user || userAlias) && (
+        <div className="p-5 border-t border-white/5 mt-auto">
           <div
-            className="flex items-center gap-3 p-3 liquid-glass rounded-xl border border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
-            onClick={() => { localStorage.removeItem('aws_alias'); setUserAlias(''); }}
+            className="flex items-center justify-between gap-3 p-3 liquid-glass rounded-xl border border-white/5 cursor-pointer hover:bg-white/5 transition-colors group"
+            onClick={() => logout()}
+            title="Log out"
           >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#4F46E5] flex items-center justify-center text-white font-bold text-sm shrink-0">
-              {userAlias.charAt(0).toUpperCase()}
+            <div className="flex items-center gap-3 overflow-hidden min-w-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#4F46E5] flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {(userAlias || user?.email || 'A').charAt(0).toUpperCase()}
+              </div>
+              <div className="overflow-hidden min-w-0">
+                <p className="text-white text-xs font-medium truncate">
+                  {userAlias ? `@${userAlias}` : (user?.email?.split('@')[0] || 'Account')}
+                </p>
+                <p className="text-white/40 text-[10px] group-hover:text-red-400 transition-colors flex items-center gap-1">
+                  <LogOut size={10} /> Logout
+                </p>
+              </div>
             </div>
-            <div className="overflow-hidden">
-              <p className="text-white text-xs font-medium truncate">@{userAlias}</p>
-              <p className="text-red-400/70 text-[10px] hover:text-red-400 transition-colors">Unlink alias</p>
-            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                logout();
+              }}
+              className="text-white/40 group-hover:text-red-400 p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0"
+              title="Logout"
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       )}
