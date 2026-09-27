@@ -12,10 +12,9 @@ import AdminSidebar from '../components/AdminSidebar';
 type AdminView = 'overview' | 'invitations' | 'activity' | 'signups' | 'forms' | 'network' | 'registry' | 'exports';
 
 export default function AdminDashboard({ view = 'overview' }: { view?: AdminView }) {
-  const { user } = useAuth();
+  const { user, isAdmin, loading: authLoading, roleLoading } = useAuth();
+  const checkingRole = authLoading || roleLoading;
   const { allUsers, loading, refresh } = usePrivateSignupRows();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [checkingRole, setCheckingRole] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState('');
   const [inviteLink, setInviteLink] = useState('');
@@ -28,20 +27,6 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
   const [registrySourceFilter, setRegistrySourceFilter] = useState('all');
   const [loadingRegistry, setLoadingRegistry] = useState(false);
   const [copied, setCopied] = useState('');
-
-  useEffect(() => {
-    if (!user) { setCheckingRole(false); return; }
-    void (async () => {
-      try {
-        const { data } = await supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
-        setIsAdmin(Boolean(data));
-      } catch {
-        setIsAdmin(false);
-      } finally {
-        setCheckingRole(false);
-      }
-    })();
-  }, [user]);
 
   const loadAdminData = async () => {
     try {
