@@ -322,14 +322,108 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
           <div><p className="text-orange-400 text-xs font-semibold tracking-[.24em] uppercase mb-3">Admin control room</p><h1 className="text-4xl sm:text-6xl leading-none">{titles[view][0]}</h1><p className="text-white/50 mt-4">{titles[view][1]}</p></div>
         </header>
 
-        {view === 'overview' && <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {[
-            { label: 'Active SBCLs', value: sbcls.length, icon: ShieldCheck, color: '#F97316' },
-            { label: 'Valid signups', value: attributed.filter((u) => u.isValid !== false).length, icon: Users, color: '#00CFFF' },
-            { label: 'Sub-referrers', value: sbcls.reduce((sum, item) => sum + item.subReferrers, 0), icon: Network, color: '#A78BFA' },
-            { label: 'Program points', value: attributed.filter((u) => u.isValid !== false).length * 15, icon: Zap, color: '#34D399' },
-          ].map(({ label, value, icon: Icon, color }) => <div key={label} className="liquid-glass rounded-2xl p-5 border border-white/10"><Icon size={18} style={{ color }} className="mb-5" /><p className="text-3xl sm:text-4xl font-semibold">{loading ? '—' : value}</p><p className="text-white/40 text-xs mt-2">{label}</p></div>)}
-        </section>}
+        {view === 'overview' && (
+          <div className="space-y-6">
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { label: 'Active SBCLs', value: sbcls.length, icon: ShieldCheck, color: '#F97316' },
+                { label: 'Valid signups', value: attributed.filter((u) => u.isValid !== false).length, icon: Users, color: '#00CFFF' },
+                { label: 'Sub-referrers', value: sbcls.reduce((sum, item) => sum + item.subReferrers, 0), icon: Network, color: '#A78BFA' },
+                { label: 'Program points', value: attributed.filter((u) => u.isValid !== false).length * 15, icon: Zap, color: '#34D399' },
+              ].map(({ label, value, icon: Icon, color }) => (
+                <div key={label} className="liquid-glass rounded-2xl p-5 border border-white/10">
+                  <Icon size={18} style={{ color }} className="mb-5" />
+                  <p className="text-3xl sm:text-4xl font-semibold">{loading ? '—' : value}</p>
+                  <p className="text-white/40 text-xs mt-2">{label}</p>
+                </div>
+              ))}
+            </section>
+
+            {/* Quick Navigation Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Link to="/admin/network" className="p-4 liquid-glass rounded-2xl border border-white/10 hover:border-orange-400/40 transition-all group">
+                <Network size={20} className="text-[#A78BFA] mb-2 group-hover:scale-110 transition-transform" />
+                <p className="font-semibold text-sm text-white">Referral Network</p>
+                <p className="text-white/40 text-xs mt-0.5">{sbcls.length} SBCLs · {subReferrals.length} Sub-refs</p>
+              </Link>
+              <Link to="/admin/signups" className="p-4 liquid-glass rounded-2xl border border-white/10 hover:border-[#00CFFF]/40 transition-all group">
+                <Users size={20} className="text-[#00CFFF] mb-2 group-hover:scale-110 transition-transform" />
+                <p className="font-semibold text-sm text-white">Signup Records</p>
+                <p className="text-white/40 text-xs mt-0.5">{attributed.length} Total Submissions</p>
+              </Link>
+              <Link to="/admin/registry" className="p-4 liquid-glass rounded-2xl border border-white/10 hover:border-emerald-400/40 transition-all group">
+                <Database size={20} className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />
+                <p className="font-semibold text-sm text-white">ALICE ID Database</p>
+                <p className="text-white/40 text-xs mt-0.5">{registry.length} Unique Aliases</p>
+              </Link>
+              <Link to="/admin/invitations" className="p-4 liquid-glass rounded-2xl border border-white/10 hover:border-orange-400/40 transition-all group">
+                <Link2 size={20} className="text-orange-400 mb-2 group-hover:scale-110 transition-transform" />
+                <p className="font-semibold text-sm text-white">SBCL Invitations</p>
+                <p className="text-white/40 text-xs mt-0.5">Invite new campus leaders</p>
+              </Link>
+            </div>
+
+            {/* SBCL Performance Summary on Overview */}
+            <section className="liquid-glass rounded-3xl border border-white/10 overflow-hidden">
+              <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">SBCL Teams Overview</h2>
+                  <p className="text-white/35 text-xs mt-1">Campus leaders and performance summary.</p>
+                </div>
+                <Link to="/admin/network" className="text-xs text-orange-400 hover:text-orange-300 font-semibold">
+                  View Full Network →
+                </Link>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead className="bg-[#0b0f1a] text-left text-white/35 text-[10px] uppercase tracking-widest">
+                    <tr>
+                      <th className="p-4 pl-6">Rank</th>
+                      <th className="p-4">Campus / SBCL</th>
+                      <th className="p-4">Code</th>
+                      <th className="p-4">Signups</th>
+                      <th className="p-4">Sub-referrers</th>
+                      <th className="p-4">Points</th>
+                      <th className="p-4 text-right pr-6">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!sbcls.length ? (
+                      <tr>
+                        <td colSpan={7} className="p-10 text-center text-white/35">
+                          No SBCL teams found yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      sbcls.slice(0, 5).map((sbcl, index) => (
+                        <tr key={sbcl.code} className="border-t border-white/[.06]">
+                          <td className="p-4 pl-6 text-white/40">#{index + 1}</td>
+                          <td className="p-4 font-medium text-white">{sbcl.name}</td>
+                          <td className="p-4 font-mono text-orange-400">{sbcl.code}</td>
+                          <td className="p-4 font-semibold text-white">
+                            {sbcl.validUsers.length}{' '}
+                            {sbcl.flaggedCount > 0 && (
+                              <span className="text-amber-400 text-xs font-normal">
+                                ({sbcl.flaggedCount} flagged)
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-white/60">{sbcl.subReferrers}</td>
+                          <td className="p-4 text-emerald-400 font-bold">{sbcl.points} pts</td>
+                          <td className="p-4 text-right pr-6">
+                            <Link to={`/sbcl/${sbcl.code}`} className="text-[#00CFFF] hover:underline text-xs">
+                              Open →
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
 
         {view === 'invitations' && <section className="liquid-glass rounded-3xl border border-white/10 p-6 mb-6">
           <div className="flex items-center gap-3 mb-5"><div className="w-10 h-10 rounded-xl bg-orange-400/10 text-orange-400 flex items-center justify-center"><Link2 size={20} /></div><div><h2 className="text-2xl">Create an SBCL invite link</h2><p className="text-white/35 text-xs">Generate a private, one-time signup URL and share it directly with the invited person.</p></div></div>
