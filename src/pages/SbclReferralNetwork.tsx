@@ -53,17 +53,23 @@ export default function SbclReferralNetwork() {
       setCheckingAccess(false);
       return;
     }
+    const currentCode = sbclCode.toUpperCase();
     Promise.all([
       supabase
         .from('sbcl_profiles')
         .select('sbcl_code,alias_id,form_slug,name')
+        .or(`sbcl_code.ilike.${currentCode},alias_id.ilike.${currentCode},form_slug.ilike.${currentCode}`)
+        .maybeSingle(),
+      supabase
+        .from('sbcl_profiles')
+        .select('sbcl_code')
         .eq('user_id', user.id)
         .maybeSingle(),
       supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle(),
     ])
-      .then(([profile, admin]) => {
-        setSbclProfile(profile.data || null);
-        setAssignedCode(profile.data ? sanitizeReferralPart(String(profile.data.sbcl_code), 3) : '');
+      .then(([workspaceProfile, myProfile, admin]) => {
+        setSbclProfile(workspaceProfile.data || null);
+        setAssignedCode(myProfile.data ? sanitizeReferralPart(String(myProfile.data.sbcl_code), 3) : '');
         setIsAdminAccess(Boolean(admin.data));
       })
       .catch(() => {
@@ -72,7 +78,7 @@ export default function SbclReferralNetwork() {
         setIsAdminAccess(false);
       })
       .finally(() => setCheckingAccess(false));
-  }, [user]);
+  }, [user, sbclCode]);
 
   useEffect(() => {
     if (!user || (!isAdminAccess && assignedCode !== sbclCode)) return;
@@ -225,6 +231,8 @@ export default function SbclReferralNetwork() {
     );
   }
 
+  const fullAliasSlug = (sbclProfile?.alias_id || sbclProfile?.form_slug || sbclCode).toLowerCase().replace(/^@/, '');
+
   return (
     <div className="min-h-screen bg-[#070B14] pt-24 pb-16 px-4 sm:px-6 text-white">
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_5%,rgba(0,207,255,.12),transparent_35%),radial-gradient(circle_at_85%_15%,rgba(124,58,237,.18),transparent_32%)]" />
@@ -352,7 +360,7 @@ export default function SbclReferralNetwork() {
             </div>
             <div className="flex items-center gap-2">
               <Link
-                to={`/join-team/${sbclCode.toLowerCase()}`}
+                to={`/join-team/${fullAliasSlug}`}
                 target="_blank"
                 className="text-xs text-[#00CFFF] hover:underline flex items-center gap-1 shrink-0"
               >
@@ -368,7 +376,7 @@ export default function SbclReferralNetwork() {
                 No sub-referrers active yet. Share your team invite link to onboard sub-referrers.
               </p>
               <Link
-                to={`/join-team/${sbclCode.toLowerCase()}`}
+                to={`/join-team/${fullAliasSlug}`}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#00CFFF] hover:underline"
               >
                 Open team signup page →

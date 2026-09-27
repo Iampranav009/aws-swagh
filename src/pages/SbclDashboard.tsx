@@ -58,17 +58,23 @@ export default function SbclDashboard() {
       setCheckingAccess(false);
       return;
     }
+    const currentCode = sbclCode.toUpperCase();
     Promise.all([
       supabase
         .from('sbcl_profiles')
-        .select('sbcl_code,alias_id,form_slug,name')
+        .select('sbcl_code,alias_id,form_slug,name,builder_signup_url')
+        .or(`sbcl_code.ilike.${currentCode},alias_id.ilike.${currentCode},form_slug.ilike.${currentCode}`)
+        .maybeSingle(),
+      supabase
+        .from('sbcl_profiles')
+        .select('sbcl_code')
         .eq('user_id', user.id)
         .maybeSingle(),
       supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle(),
     ])
-      .then(([profile, admin]) => {
-        setSbclProfile(profile.data || null);
-        setAssignedCode(profile.data ? sanitizeReferralPart(String(profile.data.sbcl_code), 3) : '');
+      .then(([workspaceProfile, myProfile, admin]) => {
+        setSbclProfile(workspaceProfile.data || null);
+        setAssignedCode(myProfile.data ? sanitizeReferralPart(String(myProfile.data.sbcl_code), 3) : '');
         setIsAdminAccess(Boolean(admin.data));
       })
       .catch(() => {
@@ -77,7 +83,7 @@ export default function SbclDashboard() {
         setIsAdminAccess(false);
       })
       .finally(() => setCheckingAccess(false));
-  }, [user]);
+  }, [user, sbclCode]);
 
   useEffect(() => {
     if (!user || (!isAdminAccess && assignedCode !== sbclCode)) return;
@@ -128,7 +134,11 @@ export default function SbclDashboard() {
   }, [filterType, selectedSubReferrer, searchQuery, allSignups, directSignups, subReferralSignups]);
 
   const aliasOrCode = sbclProfile?.alias_id || sbclProfile?.form_slug || sbclCode;
-  const directFormLink = buildSbclFormLink(aliasOrCode);
+  const fullAliasSlug = aliasOrCode.toLowerCase().replace(/^@/, '');
+  const directFormLink = buildSbclFormLink(fullAliasSlug);
+  const teamJoinLink = typeof window !== 'undefined'
+    ? `${window.location.origin}/join-team/${fullAliasSlug}`
+    : `/join-team/${fullAliasSlug}`;
 
   const copy = async (value: string, key: string) => {
     await navigator.clipboard.writeText(value);
@@ -406,13 +416,11 @@ export default function SbclDashboard() {
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-[#A78BFA] font-mono text-sm truncate">
-                  {typeof window !== 'undefined'
-                    ? `${window.location.origin}/join-team/${sbclCode.toLowerCase()}`
-                    : `/join-team/${sbclCode.toLowerCase()}`}
+                  {teamJoinLink}
                 </div>
                 <button
                   onClick={() =>
-                    copy(`${window.location.origin}/join-team/${sbclCode.toLowerCase()}`, 'sub-invite')
+                    copy(teamJoinLink, 'sub-invite')
                   }
                   className="px-4 py-3 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#4F46E5] text-white flex items-center justify-center gap-2 text-sm font-semibold hover:opacity-95 transition-opacity shrink-0 shadow-lg shadow-purple-500/20"
                 >

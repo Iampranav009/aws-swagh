@@ -3,16 +3,15 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Users, ShieldCheck, ArrowRight, Sparkles, CheckCircle2, Lock, Mail, User, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { sanitizeReferralPart } from '../lib/referrals';
 import { normalizeAlias } from '../lib/utils';
 
 export default function SubReferralJoin() {
   const { sbclCode: rawCode = '' } = useParams();
-  const sbclCode = sanitizeReferralPart(rawCode, 8);
+  const cleanParam = normalizeAlias(rawCode);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
-  const [sbclInfo, setSbclInfo] = useState<{ name: string; sbcl_code: string; builder_signup_url?: string } | null>(null);
+  const [sbclInfo, setSbclInfo] = useState<{ name: string; sbcl_code: string; builder_signup_url?: string; alias_id?: string } | null>(null);
   const [loadingSbcl, setLoadingSbcl] = useState(true);
   const [sbclError, setSbclError] = useState('');
 
@@ -27,35 +26,56 @@ export default function SubReferralJoin() {
   const [registered, setRegistered] = useState(false);
 
   useEffect(() => {
-    if (!sbclCode) {
-      setSbclError('Missing SBCL referral code in URL.');
+    if (!cleanParam) {
+      setSbclError('Missing referral code or alias ID in URL.');
       setLoadingSbcl(false);
       return;
     }
 
     async function loadSbcl() {
       try {
-        const { data, error } = await supabase
+        // 1. Try finding in sbcl_profiles (by alias_id, form_slug, or sbcl_code)
+        let { data, error } = await supabase
           .from('sbcl_profiles')
-          .select('name,sbcl_code,builder_signup_url')
-          .or(`sbcl_code.ilike.${sbclCode},form_slug.ilike.${sbclCode},alias_id.ilike.${sbclCode}`)
+          .select('name,sbcl_code,builder_signup_url,alias_id')
+          .or(`sbcl_code.ilike.${cleanParam},form_slug.ilike.${cleanParam},alias_id.ilike.${cleanParam}`)
           .maybeSingle();
 
+        // 2. If not found in sbcl_profiles, check if it's a sub_referral's alias
+        if (!data) {
+          const { data: subData } = await supabase
+            .from('sub_referrals')
+            .select('name,code,sbcl_code')
+            .ilike('code', cleanParam)
+            .maybeSingle();
+
+          if (subData?.sbcl_code) {
+            const { data: parentSbcl } = await supabase
+              .from('sbcl_profiles')
+              .select('name,sbcl_code,builder_signup_url,alias_id')
+              .eq('sbcl_code', subData.sbcl_code)
+              .maybeSingle();
+            if (parentSbcl) {
+              data = parentSbcl;
+            }
+          }
+        }
+
         if (error || !data) {
-          setSbclError('This SBCL referral link is not active or could not be found.');
+          setSbclError('This referral link is not active or could not be found.');
         } else {
           setSbclInfo(data);
           localStorage.setItem('sub_referrer_sbcl', data.sbcl_code);
         }
       } catch {
-        setSbclError('Could not verify SBCL link.');
+        setSbclError('Could not verify referral link.');
       } finally {
         setLoadingSbcl(false);
       }
     }
 
     loadSbcl();
-  }, [sbclCode]);
+  }, [cleanParam]);
 
   // If user is already logged in, check if we can register their alias directly
   const handleExistingUserJoin = async (e: React.FormEvent) => {
