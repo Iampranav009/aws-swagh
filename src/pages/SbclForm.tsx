@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Copy, ExternalLink, ShieldCheck, Sparkles } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Gift, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { loadPublicSbclForm, submitSbclForm, type PublicSbclForm } from '../lib/sbclForms';
 
@@ -27,7 +27,6 @@ export default function SbclForm() {
   const [loadError, setLoadError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [complete, setComplete] = useState(false);
-  const [copiedWhatsapp, setCopiedWhatsapp] = useState(false);
   const [error, setError] = useState('');
   const [values, setValues] = useState({
     name: '',
@@ -90,18 +89,18 @@ export default function SbclForm() {
   if (complete) {
     return (
       <div className="min-h-screen bg-[#070B14] flex items-center justify-center p-4 sm:p-6 text-white relative overflow-hidden">
-        <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_15%,rgba(0,207,255,.22),transparent_42%),radial-gradient(circle_at_15%_75%,rgba(124,58,237,.2),transparent_35%)]" />
+        <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_15%,rgba(16,185,129,.14),transparent_45%),radial-gradient(circle_at_85%_75%,rgba(124,58,237,.16),transparent_35%)]" />
 
         <div className="relative max-w-lg w-full liquid-glass rounded-3xl border border-white/10 p-6 sm:p-9 text-center shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
           {/* Subtle Top Accent Beam */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#7C3AED] via-[#00CFFF] to-[#38BDF8]" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-[#00CFFF] to-[#7C3AED]" />
 
-          {/* Tick mark in the glowing blue ring */}
-          <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full bg-[#00CFFF]/10 border-2 border-[#00CFFF] flex items-center justify-center mb-5 shadow-[0_0_35px_rgba(0,207,255,0.45)]">
-            <CheckCircle2 size={46} className="text-[#00CFFF]" />
+          {/* Green Tick mark in a clean glowing ring */}
+          <div className="w-20 h-20 sm:w-22 sm:h-22 mx-auto rounded-full bg-emerald-500/10 border-2 border-emerald-400 flex items-center justify-center mb-5 shadow-[0_0_35px_rgba(52,211,153,0.3)]">
+            <CheckCircle2 size={46} className="text-emerald-400" />
           </div>
 
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00CFFF]/10 border border-[#00CFFF]/25 text-[#00CFFF] text-xs font-semibold uppercase tracking-wider mb-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <Sparkles size={13} />
             Registration Confirmed
           </span>
@@ -116,89 +115,39 @@ export default function SbclForm() {
             </span>.
           </p>
 
-          {/* WhatsApp Group Box */}
-          <div className="rounded-2xl border border-[#25D366]/35 bg-[#25D366]/10 p-5 sm:p-6 text-left my-6 relative overflow-hidden shadow-lg shadow-emerald-950/40">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2 text-[#25D366]">
-                <WhatsAppIcon size={22} />
-                <span className="text-xs font-bold uppercase tracking-wider text-[#25D366]">
-                  Official Builder Community
-                </span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 font-semibold">
-                Instant Access
-              </span>
+          {/* Official Builder Community short section */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left my-6">
+            <div className="flex items-center gap-2 mb-1 text-white/90">
+              <WhatsAppIcon size={16} className="text-[#25D366]" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-white/80">
+                Official Builder Community
+              </h2>
             </div>
-
-            <h2 className="text-lg sm:text-xl font-bold text-white leading-snug">
-              Join WhatsApp group for new exciting opportunities
-            </h2>
-            <p className="text-white/65 text-xs mt-1.5 leading-relaxed">
-              Connect with fellow builders, receive announcements for upcoming cloud challenges, workshops, giveaway prizes, exclusive swags, and hackathons.
+            <p className="text-white/50 text-xs leading-relaxed">
+              Connect with fellow builders for updates on upcoming cloud challenges, workshops, and exclusive swags.
             </p>
+          </div>
 
-            {/* URL Display with Copy Button */}
-            <div className="mt-4 flex items-center gap-2 bg-black/40 rounded-xl p-2 border border-white/10">
-              <span className="text-xs font-mono text-[#00CFFF] truncate px-2 flex-1">
-                {WHATSAPP_GROUP_URL}
-              </span>
-              <button
-                type="button"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(WHATSAPP_GROUP_URL);
-                  setCopiedWhatsapp(true);
-                  setTimeout(() => setCopiedWhatsapp(false), 2000);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1.5 transition-all shrink-0"
-                title="Copy WhatsApp link"
-              >
-                {copiedWhatsapp ? (
-                  <>
-                    <Check size={13} className="text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={13} />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
+          {/* Action buttons: Left: Explore Swag, Right: Join WhatsApp Group */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <Link
+              to="/rewards"
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white font-medium text-xs sm:text-sm transition-all"
+            >
+              <Gift size={16} className="text-[#A78BFA]" />
+              <span>Explore Swag</span>
+            </Link>
 
-            {/* Join WhatsApp Button */}
             <a
               href={WHATSAPP_GROUP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3.5 w-full flex items-center justify-center gap-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-black font-bold py-3.5 px-4 text-sm transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.99]"
+              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#25D366]/40 text-white hover:text-[#25D366] font-medium text-xs sm:text-sm transition-all"
             >
-              <WhatsAppIcon size={18} />
+              <WhatsAppIcon size={16} className="text-[#25D366]" />
               <span>Join WhatsApp Group</span>
-              <ExternalLink size={15} />
+              <ExternalLink size={13} className="text-white/40" />
             </a>
-          </div>
-
-          {/* Quick Action Navigation */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <Link
-              to="/leaderboard"
-              className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all text-center font-medium"
-            >
-              View Leaderboard
-            </Link>
-            <Link
-              to="/rewards"
-              className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all text-center font-medium"
-            >
-              Explore Swags
-            </Link>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <Link to="/" className="text-xs text-white/40 hover:text-white/70 transition-colors">
-              ← Return to homepage
-            </Link>
           </div>
         </div>
       </div>
