@@ -22,6 +22,7 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
   const [selectedSbcl, setSelectedSbcl] = useState('');
   const [profiles, setProfiles] = useState<any[]>([]);
   const [subReferrals, setSubReferrals] = useState<any[]>([]);
+  const [invites, setInvites] = useState<any[]>([]);
   const [registry, setRegistry] = useState<any[]>([]);
   const [registrySearch, setRegistrySearch] = useState('');
   const [registrySourceFilter, setRegistrySourceFilter] = useState('all');
@@ -30,12 +31,14 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
 
   const loadAdminData = async () => {
     try {
-      const [profilesRes, subsRes] = await Promise.all([
+      const [profilesRes, subsRes, invitesRes] = await Promise.all([
         supabase.from('sbcl_profiles').select('*').order('sbcl_code'),
         supabase.from('sub_referrals').select('*').order('created_at', { ascending: false }),
+        supabase.from('sbcl_invites').select('*').order('created_at', { ascending: false }),
       ]);
       if (profilesRes.data) setProfiles(profilesRes.data);
       if (subsRes.data) setSubReferrals(subsRes.data);
+      if (invitesRes.data) setInvites(invitesRes.data);
     } catch (err) {
       console.warn('Could not load admin data:', err);
     }
@@ -118,6 +121,7 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
       setInviteStatus(`Invite created for ${inviteEmail}. Reserved SBCL code: ${generated.sbclCode}. Link expires in 7 days.`);
       setInviteLink(generated.inviteUrl);
       setInviteEmail('');
+      loadAdminData();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '';
       setInviteStatus(
@@ -410,16 +414,85 @@ export default function AdminDashboard({ view = 'overview' }: { view?: AdminView
           </div>
         )}
 
-        {view === 'invitations' && <section className="liquid-glass rounded-3xl border border-white/10 p-6 mb-6">
-          <div className="flex items-center gap-3 mb-5"><div className="w-10 h-10 rounded-xl bg-orange-400/10 text-orange-400 flex items-center justify-center"><Link2 size={20} /></div><div><h2 className="text-2xl">Create an SBCL invite link</h2><p className="text-white/35 text-xs">Generate a private, one-time signup URL and share it directly with the invited person.</p></div></div>
-          <form onSubmit={sendInvite} className="grid md:grid-cols-[1fr_180px_auto] gap-3">
-            <input type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="leader@college.edu" className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-orange-400" />
-            <div className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 font-mono text-orange-400 flex items-center">{deriveSbclCodeFromEmail(inviteEmail) || 'AUTO'}<span className="text-white/25 text-[10px] ml-2">AUTO-UNIQUE</span></div>
-            <button disabled={sending} className="rounded-xl bg-orange-500 hover:bg-orange-400 text-white px-6 py-3 font-semibold disabled:opacity-50">{sending ? 'Generating…' : 'Generate invite URL'}</button>
-          </form>
-          {inviteStatus && <p className="text-sm text-white/60 mt-3">{inviteStatus}</p>}
-          {inviteLink && <div className="mt-4 flex flex-col sm:flex-row gap-2"><input readOnly value={inviteLink} className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-xs text-white/70" /><button type="button" onClick={() => navigator.clipboard.writeText(inviteLink)} className="rounded-xl border border-orange-400/30 text-orange-300 px-4 py-3 font-semibold flex items-center justify-center gap-2"><Copy size={16} /> Copy URL</button></div>}
-        </section>}
+        {view === 'invitations' && (
+          <div className="space-y-6">
+            <section className="liquid-glass rounded-3xl border border-white/10 p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-orange-400/10 text-orange-400 flex items-center justify-center">
+                  <Link2 size={20} />
+                </div>
+                <div>
+                  <h2 className="text-2xl">Create an SBCL invite link</h2>
+                  <p className="text-white/35 text-xs">Generate a private, one-time signup URL and share it directly with the invited person.</p>
+                </div>
+              </div>
+              <form onSubmit={sendInvite} className="grid md:grid-cols-[1fr_180px_auto] gap-3">
+                <input type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="leader@college.edu" className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-orange-400" />
+                <div className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 font-mono text-orange-400 flex items-center">{deriveSbclCodeFromEmail(inviteEmail) || 'AUTO'}<span className="text-white/25 text-[10px] ml-2">AUTO-UNIQUE</span></div>
+                <button disabled={sending} className="rounded-xl bg-orange-500 hover:bg-orange-400 text-white px-6 py-3 font-semibold disabled:opacity-50">{sending ? 'Generating…' : 'Generate invite URL'}</button>
+              </form>
+              {inviteStatus && <p className="text-sm text-white/60 mt-3">{inviteStatus}</p>}
+              {inviteLink && <div className="mt-4 flex flex-col sm:flex-row gap-2"><input readOnly value={inviteLink} className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-xs text-white/70" /><button type="button" onClick={() => navigator.clipboard.writeText(inviteLink)} className="rounded-xl border border-orange-400/30 text-orange-300 px-4 py-3 font-semibold flex items-center justify-center gap-2"><Copy size={16} /> Copy URL</button></div>}
+            </section>
+
+            {/* Invitations History Table */}
+            <section className="liquid-glass rounded-3xl border border-white/10 overflow-hidden">
+              <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold">All SBCL Invitations</h3>
+                  <p className="text-white/35 text-xs mt-1">Track status of generated campus leader invitation links.</p>
+                </div>
+                <span className="text-xs text-orange-400 bg-orange-400/10 border border-orange-400/20 px-3 py-1 rounded-xl">
+                  {invites.length} Invitations
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-white/35 text-[10px] uppercase tracking-widest bg-black/20">
+                    <tr>
+                      <th className="p-4 pl-6">Email</th>
+                      <th className="p-4">Reserved Code</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Created Date</th>
+                      <th className="p-4">Expires</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!invites.length ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-white/35">No invitations generated yet.</td>
+                      </tr>
+                    ) : (
+                      invites.map((inv) => (
+                        <tr key={inv.email} className="border-t border-white/[.06]">
+                          <td className="p-4 pl-6 font-medium text-white">{inv.email}</td>
+                          <td className="p-4 font-mono text-orange-400">{inv.sbcl_code}</td>
+                          <td className="p-4">
+                            {inv.status === 'verified' ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full font-medium">
+                                <Check size={12} /> Activated
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full font-medium">
+                                Pending Activation
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-white/50 text-xs">
+                            {inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-GB') : '—'}
+                          </td>
+                          <td className="p-4 text-white/40 text-xs">
+                            {inv.invite_expires_at ? new Date(inv.invite_expires_at).toLocaleDateString('en-GB') : '—'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
 
         {view === 'network' && (
           <div className="space-y-6">

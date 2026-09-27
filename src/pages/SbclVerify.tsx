@@ -23,9 +23,17 @@ export default function SbclVerify() {
     loadSbclInvite(token).then(setInvite).catch((cause) => setError(cause instanceof Error ? cause.message : 'Invalid invitation link.')).finally(() => setLoading(false));
   }, [token]);
 
+  useEffect(() => {
+    if (user && !name) {
+      const metaName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+      if (metaName) setName(metaName);
+    }
+  }, [user, name]);
+
   const googleSignIn = async () => {
     localStorage.setItem('sbcl_invite_name', name.trim());
     localStorage.setItem('sbcl_invite_alias', aliasId.trim());
+    localStorage.setItem('auth_return_to', `${window.location.pathname}${window.location.search}`);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.href },
